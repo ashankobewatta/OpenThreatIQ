@@ -1,135 +1,104 @@
-/* Reset */
-* {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
+:root {
+    --bg-color: #f4f4f4;
+    --text-color: #222;
+    --card-bg: #fff;
+    --badge-cve: #e74c3c;
+    --badge-malware: #f39c12;
+    --badge-phishing: #3498db;
+    --badge-exploit: #9b59b6;
+    --badge-update: #2ecc71;
 }
 
-/* Light Mode (default) */
+body.dark {
+    --bg-color: #121212;
+    --text-color: #ddd;
+    --card-bg: #1e1e1e;
+}
+
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: #f0f2f5;
-    color: #333;
-    padding: 20px;
-    transition: background 0.3s, color 0.3s;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0 20px;
+    transition: background-color 0.3s, color 0.3s;
 }
 
-h1 {
+header {
     text-align: center;
-    margin-bottom: 25px;
-    color: #222;
-    font-weight: 600;
+    padding: 20px 0;
 }
 
-/* Filters */
-.filters {
+.controls {
     display: flex;
-    gap: 15px;
     justify-content: center;
-    margin-bottom: 20px;
+    gap: 10px;
     flex-wrap: wrap;
+    margin-bottom: 20px;
 }
 
-.filters input,
-.filters select,
-#dark-mode-toggle {
-    padding: 10px 15px;
-    border-radius: 8px;
+.controls input, .controls select, .controls button {
+    padding: 5px 10px;
+    border-radius: 5px;
     border: 1px solid #ccc;
-    font-size: 0.95rem;
-    transition: all 0.2s ease-in-out;
+    transition: all 0.2s;
+}
+
+.controls button {
     cursor: pointer;
 }
 
-.filters input:focus,
-.filters select:focus {
-    border-color: #007BFF;
-    box-shadow: 0 0 8px rgba(0,123,255,0.2);
+.controls input:focus, .controls select:focus, .controls button:focus {
     outline: none;
+    border-color: #3498db;
 }
 
-/* CVE Cards */
+.grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 15px;
+}
+
 .cve-card {
-    background: #ffffff;
-    padding: 20px;
-    margin: 12px auto;
-    border-radius: 12px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    transition: transform 0.2s, box-shadow 0.2s, background 0.3s, color 0.3s;
-    max-width: 800px;
-    position: relative;
+    background: var(--card-bg);
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
 }
 
 .cve-card:hover {
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+    transform: translateY(-5px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
 }
 
 .cve-card h3 {
-    font-size: 1.1rem;
-    color: #007BFF;
-    margin-bottom: 8px;
+    margin: 0 0 10px;
+    font-size: 1.1em;
 }
 
 .cve-card p {
-    font-size: 0.95rem;
-    margin-bottom: 10px;
-    line-height: 1.4;
+    font-size: 0.95em;
 }
 
 .cve-card small {
-    font-size: 0.8rem;
-    color: #555;
+    display: block;
+    margin-top: 10px;
+    font-size: 0.8em;
+    color: #888;
 }
 
-/* Badges for type */
 .badge {
     display: inline-block;
-    padding: 3px 8px;
+    padding: 2px 8px;
     border-radius: 12px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    margin-left: 5px;
     color: #fff;
+    font-size: 0.75em;
+    margin-right: 5px;
 }
 
-.badge.CVE { background: #007BFF; }
-.badge.Malware { background: #dc3545; }
-.badge.Phishing { background: #fd7e14; }
-.badge.Exploit { background: #6f42c1; }
-.badge.Update { background: #28a745; }
-
-/* Container fade-in */
-#cve-container {
-    animation: fadeIn 0.5s ease-in-out;
-}
-
-@keyframes fadeIn { from {opacity:0;} to {opacity:1;} }
-
-/* Dark Mode */
-body.dark-mode {
-    background: #121212;
-    color: #ddd;
-}
-
-body.dark-mode .cve-card {
-    background: #1e1e1e;
-    color: #ddd;
-    box-shadow: 0 4px 12px rgba(255,255,255,0.05);
-}
-
-body.dark-mode .cve-card h3 {
-    color: #66b0ff;
-}
-
-body.dark-mode .cve-card small {
-    color: #aaa;
-}
-
-/* Responsive */
-@media (max-width: 600px) {
-    .filters {
-        flex-direction: column;
-        gap: 10px;
-    }
-}
+.badge.CVE { background: var(--badge-cve); }
+.badge.Malware { background: var(--badge-malware); }
+.badge.Phishing { background: var(--badge-phishing); }
+.badge.Exploit { background: var(--badge-exploit); }
+.badge.Update { background: var(--badge-update); }
