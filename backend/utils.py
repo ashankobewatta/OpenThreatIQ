@@ -1,181 +1,99 @@
-import requests, json, os, gzip, io, sqlite3, threading, time
-from datetime import datetime, timedelta, timezone
-import xml.etree.ElementTree as ET
+import os, json, feedparser, requests, sqlite3
+from datetime import datetime, timedelta
 
-DB_FILE = "data/threatiq.db"
-CACHE_SETTINGS_FILE = "data/cache_settings.json"
-DEFAULT_CACHE_EXPIRY_MINUTES = 10
+CACHE_FILE = "data/cve_cache.json"
+CACHE_EXPIRY_MINUTES = 30
+DB_FILE = "data/threatintel.db"
 
-FEED_URLS = [
-    {"name": "NVD", "url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "type": "CVE"},
-    {"name": "Google Security Blog", "url": "https://security.googleblog.com/feeds/posts/default", "type": "Update"},
-    {"name": "Microsoft Security Blog", "url": "https://www.microsoft.com/en-us/security/blog/feed/", "type": "Update"},
-    {"name": "Bleeping Computer", "url": "https://www.bleepingcomputer.com/feed/", "type": "Update"}
+# verified free feeds
+FEEDS = [
+    {"url": "https://www.bleepingcomputer.com/feed/", "type": "Malware", "source": "BleepingComputer"},
+    {"url": "https://blog.google/threat-analysis/feed/", "type": "CVE", "source": "Google Security Blog"},
+    {"url": "https://msrc.microsoft.com/update-guide/rss", "type": "CVE", "source": "Microsoft Security"}
 ]
 
-# ---------------- DB Initialization ----------------
 def init_db():
     os.makedirs("data", exist_ok=True)
     conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS cve_entries (
-            id TEXT PRIMARY KEY,
-            description TEXT,
-            published_date TEXT,
-            type TEXT,
-            source TEXT,
-            read_flag INTEGER DEFAULT 0
-        )
-    """)
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS custom_feeds (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT,
-            url TEXT,
-            type TEXT
-        )
-    """)
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS user_feeds (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    url TEXT UNIQUE,
+                    type TEXT,
+                    source TEXT
+                )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS read_cves (
+                    id TEXT PRIMARY KEY
+                )''')
     conn.commit()
     conn.close()
 
-# ---------------- Cache Interval ----------------
-def get_cache_interval():
-    if os.path.exists(CACHE_SETTINGS_FILE):
-        try:
-            with open(CACHE_SETTINGS_FILE, "r") as f:
-                data = json.load(f)
-                return int(data.get("cache_expiry_minutes", DEFAULT_CACHE_EXPIRY_MINUTES))
-        except:
-            return DEFAULT_CACHE_EXPIRY_MINUTES
-    return DEFAULT_CACHE_EXPIRY_MINUTES
+init_db()
+
+def get_user_feeds():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT url, type, source FROM user_feeds")
+    feeds = [{"url": row[0], "type": row[1], "source": row[2]} for row in c.fetchall()]
+    conn.close()
+    return feeds
+
+def add_custom_feed(url, feed_type="Other", source="User Feed"):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("INSERT OR IGNORE INTO user_feeds (url, type, source) VALUES (?, ?, ?)",
+              (url, feed_type, source))
+    conn.commit()
+    conn.close()
+
+def mark_read(cve_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("INSERT OR IGNORE INTO read_cves (id) VALUES (?)", (cve_id,))
+    conn.commit()
+    conn.close()
+
+def is_read(cve_id):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT 1 FROM read_cves WHERE id=?", (cve_id,))
+    result = c.fetchone()
+    conn.close()
+    return bool(result)
 
 def set_cache_interval(minutes):
-    os.makedirs("data", exist_ok=True)
-    with open(CACHE_SETTINGS_FILE, "w") as f:
-        json.dump({"cache_expiry_minutes": minutes}, f)
+    global CACHE_EXPIRY_MINUTES
+    CACHE_EXPIRY_MINUTES = minutes
 
-# ---------------- Fetch All Feeds ----------------
 def fetch_all_feeds():
-    init_db()
-    conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
+    os.makedirs("data", exist_ok=True)
+    if os.path.exists(CACHE_FILE):
+        mtime = datetime.fromtimestamp(os.path.getmtime(CACHE_FILE))
+        if datetime.now() - mtime < timedelta(minutes=CACHE_EXPIRY_MINUTES):
+            print(f"[{datetime.now().isoformat()}] Using cached CVEs from {CACHE_FILE}")
+            with open(CACHE_FILE, "r") as f:
+                return json.load(f)
 
-    # check cache freshness
-    cur.execute("SELECT MAX(published_date) FROM cve_entries")
-    last_date_row = cur.fetchone()
-    cache_expiry_minutes = get_cache_interval()
+    all_feeds = FEEDS + get_user_feeds()
+    cves = []
 
-    if last_date_row and last_date_row[0]:
+    for feed in all_feeds:
         try:
-            last_date = datetime.fromisoformat(last_date_row[0].replace("Z", "+00:00"))
-            now_utc = datetime.now(timezone.utc)
-            if now_utc - last_date < timedelta(minutes=cache_expiry_minutes):
-                print(f"[{now_utc.isoformat()}] Using cached CVEs from DB")
-                conn.close()
-                return get_all_cves()
-        except:
-            pass
-
-    all_entries = []
-
-    for feed in FEED_URLS:
-        print(f"Fetching feed: {feed['name']}")
-        try:
-            resp = requests.get(feed["url"], headers={"User-Agent": "OpenThreatIQ/1.0"}, timeout=15)
-            resp.raise_for_status()
-
-            if feed["url"].endswith(".gz"):
-                with gzip.open(io.BytesIO(resp.content), 'rt', encoding='utf-8') as f:
-                    data = json.load(f)
-                for item in data.get("CVE_Items", []):
-                    entry = {
-                        "id": item["cve"]["CVE_data_meta"]["ID"],
-                        "description": item["cve"]["description"]["description_data"][0]["value"],
-                        "published_date": item["publishedDate"],
-                        "type": feed["type"],
-                        "source": feed["name"]
-                    }
-                    save_cve_entry(entry)
-                    all_entries.append(entry)
-            else:
-                xml = ET.fromstring(resp.text)
-                for item in xml.findall(".//item"):
-                    entry = {
-                        "id": item.find("title").text if item.find("title") is not None else "N/A",
-                        "description": item.find("description").text if item.find("description") is not None else "",
-                        "published_date": item.find("pubDate").text if item.find("pubDate") is not None else "",
-                        "type": feed["type"],
-                        "source": feed["name"]
-                    }
-                    save_cve_entry(entry)
-                    all_entries.append(entry)
+            parsed = feedparser.parse(feed["url"])
+            for entry in parsed.entries:
+                cve_id = entry.get("id") or entry.get("title")[:10]
+                cves.append({
+                    "id": cve_id,
+                    "description": entry.get("summary", entry.get("description", "")),
+                    "published_date": entry.get("published", ""),
+                    "source": feed.get("source"),
+                    "type": feed.get("type"),
+                    "read_flag": is_read(cve_id)
+                })
         except Exception as e:
-            print(f"Error fetching {feed['name']}: {e}")
+            print(f"Error fetching {feed.get('source')}: {e}")
 
-    # custom feeds
-    cur.execute("SELECT name, url, type FROM custom_feeds")
-    for name, url, ftype in cur.fetchall():
-        try:
-            resp = requests.get(url, timeout=15)
-            resp.raise_for_status()
-            xml = ET.fromstring(resp.text)
-            for item in xml.findall(".//item"):
-                entry = {
-                    "id": item.find("title").text if item.find("title") is not None else "N/A",
-                    "description": item.find("description").text if item.find("description") is not None else "",
-                    "published_date": item.find("pubDate").text if item.find("pubDate") is not None else "",
-                    "type": ftype,
-                    "source": name
-                }
-                save_cve_entry(entry)
-                all_entries.append(entry)
-        except Exception as e:
-            print(f"Error fetching custom feed {name}: {e}")
+    with open(CACHE_FILE, "w") as f:
+        json.dump(cves, f, indent=2)
 
-    conn.close()
-    return all_entries
-
-# ---------------- DB helpers ----------------
-def save_cve_entry(entry):
-    conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    try:
-        cur.execute("""
-            INSERT OR REPLACE INTO cve_entries (id, description, published_date, type, source)
-            VALUES (?,?,?,?,?)
-        """, (entry["id"], entry["description"], entry["published_date"], entry["type"], entry["source"]))
-        conn.commit()
-    except Exception as e:
-        print(f"Error saving {entry['id']}: {e}")
-    finally:
-        conn.close()
-
-def get_all_cves():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    cur = conn.cursor()
-    cur.execute("SELECT * FROM cve_entries ORDER BY published_date DESC")
-    rows = cur.fetchall()
-    conn.close()
-    return [dict(r) for r in rows]
-
-def mark_cve_read(cve_id):
-    conn = sqlite3.connect(DB_FILE)
-    cur = conn.cursor()
-    cur.execute("UPDATE cve_entries SET read_flag=1 WHERE id=?", (cve_id,))
-    conn.commit()
-    conn.close()
-
-# ---------------- Background Auto-Refresh ----------------
-def start_background_refresh():
-    def refresh_loop():
-        while True:
-            try:
-                fetch_all_feeds()
-            except Exception as e:
-                print(f"Error in background refresh: {e}")
-            interval = get_cache_interval() * 60
-            time.sleep(interval)
-    thread = threading.Thread(target=refresh_loop, daemon=True)
-    thread.start()
+    return cves
