@@ -5,7 +5,6 @@ async function fetchCVEs() {
     const container = document.getElementById("cve-container");
     container.innerHTML = "";
 
-    // Gather unique sources and types for filters
     const sources = new Set();
     const types = new Set();
 
@@ -27,7 +26,6 @@ async function fetchCVEs() {
             <small>${cve.published_date}</small>
         `;
 
-        // Make card clickable to toggle read/unread
         div.addEventListener("click", async () => {
             div.classList.toggle("read");
             await fetch(`/api/mark_read/${encodeURIComponent(cve.id)}`, { method: "POST" });
@@ -39,19 +37,14 @@ async function fetchCVEs() {
     populateFilters([...sources], [...types]);
 }
 
-// ------------------ Populate dropdown filters ------------------
 function populateFilters(sources, types) {
     const sourceSelect = document.getElementById("source-filter");
     const typeSelect = document.getElementById("type-filter");
 
-    sourceSelect.innerHTML = `<option value="">All Sources</option>` + 
-        sources.map(s => `<option value="${s}">${s}</option>`).join("");
-
-    typeSelect.innerHTML = `<option value="">All Types</option>` + 
-        types.map(t => `<option value="${t}">${t}</option>`).join("");
+    sourceSelect.innerHTML = `<option value="">All Sources</option>` + sources.map(s => `<option value="${s}">${s}</option>`).join("");
+    typeSelect.innerHTML = `<option value="">All Types</option>` + types.map(t => `<option value="${t}">${t}</option>`).join("");
 }
 
-// ------------------ Filter functionality ------------------
 document.getElementById("source-filter").addEventListener("change", filterCVEs);
 document.getElementById("type-filter").addEventListener("change", filterCVEs);
 document.getElementById("search-input").addEventListener("input", filterCVEs);
@@ -65,13 +58,32 @@ function filterCVEs() {
         const type = card.querySelector(".badge.bg-primary").textContent;
         const source = card.querySelector(".badge.bg-secondary").textContent;
         const text = card.querySelector("p").textContent.toLowerCase();
-
         const matches = (!sourceVal || source === sourceVal) &&
                         (!typeVal || type === typeVal) &&
                         (!searchVal || text.includes(searchVal));
-
         card.style.display = matches ? "block" : "none";
     });
 }
+
+// Dark mode toggle
+document.getElementById("dark-toggle").addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
+});
+
+// Cache interval update
+document.getElementById("update-cache").addEventListener("click", async () => {
+    const minutes = document.getElementById("cache-interval").value;
+    if (!minutes || isNaN(minutes)) return alert("Enter a valid number");
+
+    const resp = await fetch("/api/set_cache_interval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ minutes })
+    });
+
+    const data = await resp.json();
+    if (data.status === "ok") alert(`Cache interval updated to ${data.minutes} minutes`);
+    else alert("Failed to update cache interval");
+});
 
 fetchCVEs();
