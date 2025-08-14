@@ -1,11 +1,4 @@
-# backend/utils.py
-import requests
-import json
-import os
-import gzip
-import io
-import csv
-import feedparser
+import requests, json, os, gzip, io, csv, feedparser
 from datetime import datetime, timedelta
 from io import StringIO
 
@@ -22,8 +15,8 @@ APPLE_ATOM = "https://support.apple.com/en-us/HT201222.atom"
 MOZILLA_RSS = "https://www.mozilla.org/en-US/security/advisories/feed/"
 ADOBE_RSS = "https://helpx.adobe.com/security/updates/feed.rss"
 EXPLOITDB_CSV = "https://www.exploit-db.com/archive.csv"
-MSRC_JSON = "https://api.msrc.microsoft.com/cvrf/cvrf.json"
 OPENPHISH_TXT = "https://openphish.com/feed.txt"
+MSRC_JSON = "https://api.msrc.microsoft.com/cvrf/cvrf.json"
 
 # ----------------- Fetch Functions -----------------
 def fetch_nvd():
@@ -31,7 +24,6 @@ def fetch_nvd():
     resp.raise_for_status()
     with gzip.open(io.BytesIO(resp.content), 'rt', encoding='utf-8') as f:
         data = json.load(f)
-
     entries = []
     for item in data.get("CVE_Items", []):
         entries.append({
@@ -129,7 +121,7 @@ def fetch_msrc():
         })
     return entries
 
-# ----------------- Aggregate All Feeds -----------------
+# ----------------- Aggregate Feeds -----------------
 def fetch_all_feeds():
     os.makedirs("data", exist_ok=True)
     if os.path.exists(CACHE_FILE):
@@ -138,17 +130,14 @@ def fetch_all_feeds():
             with open(CACHE_FILE, "r") as f:
                 return json.load(f)
 
-    print("Fetching latest threat intelligence from free sources...")
     all_entries = []
 
-    # NVD + malware + phishing
     for fn in [fetch_nvd, fetch_malwarebazaar, fetch_phishtank, fetch_openphish, fetch_exploitdb, fetch_msrc]:
         try:
             all_entries.extend(fn())
         except Exception as e:
             print(f"Error fetching {fn.__name__}: {e}")
 
-    # RSS/Atom feeds
     rss_feeds = [
         (BEEPING_COMPUTER_RSS, "BeepingComputer"),
         (GOOGLE_CHROME_RSS, "Google"),
@@ -156,13 +145,13 @@ def fetch_all_feeds():
         (MOZILLA_RSS, "Mozilla"),
         (ADOBE_RSS, "Adobe")
     ]
+
     for url, name in rss_feeds:
         try:
             all_entries.extend(fetch_rss_feed(url, name))
         except Exception as e:
             print(f"Error fetching RSS {name}: {e}")
 
-    # Save cache
     with open(CACHE_FILE, "w") as f:
         json.dump(all_entries, f, indent=2)
 
