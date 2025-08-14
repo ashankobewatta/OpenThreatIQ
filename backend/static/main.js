@@ -1,13 +1,5 @@
 let threats = [];
-let darkMode = false;
-
-const searchBar = document.getElementById("search-bar");
-const filterSource = document.getElementById("filter-source");
-const filterType = document.getElementById("filter-type");
-const filterRead = document.getElementById("filter-read");
-const container = document.getElementById("threat-container");
-const modalDescription = document.getElementById("modal-description");
-const threatModal = new bootstrap.Modal(document.getElementById('threatModal'));
+let modal = new bootstrap.Modal(document.getElementById('threatModal'));
 
 async function fetchThreats() {
     const res = await fetch("/api/threats");
@@ -17,73 +9,78 @@ async function fetchThreats() {
 }
 
 function populateFilters() {
-    const sources = new Set(["All"]);
-    const types = new Set(["All"]);
+    const sourceSet = new Set();
+    const typeSet = new Set();
     threats.forEach(t => {
-        sources.add(t.source || "Unknown");
-        types.add(t.type || "Unknown");
+        sourceSet.add(t.source || "Unknown");
+        typeSet.add(t.type || "Unknown");
     });
 
-    filterSource.innerHTML = Array.from(sources).map(s => `<option value="${s}">${s}</option>`).join("");
-    filterType.innerHTML = Array.from(types).map(t => `<option value="${t}">${t}</option>`).join("");
+    const sourceFilter = document.getElementById("source-filter");
+    const typeFilter = document.getElementById("type-filter");
+
+    sourceFilter.innerHTML = '<option value="">All</option>';
+    typeFilter.innerHTML = '<option value="">All</option>';
+
+    sourceSet.forEach(s => sourceFilter.innerHTML += `<option value="${s}">${s}</option>`);
+    typeSet.forEach(t => typeFilter.innerHTML += `<option value="${t}">${t}</option>`);
 }
 
 function renderThreats() {
-    const searchText = searchBar.value.toLowerCase();
-    const selectedSource = filterSource.value;
-    const selectedType = filterType.value;
-    const selectedRead = filterRead.value;
-
+    const container = document.getElementById("threat-container");
     container.innerHTML = "";
+    const sFilter = document.getElementById("source-filter").value;
+    const tFilter = document.getElementById("type-filter").value;
+    const rFilter = document.getElementById("read-filter").value;
+    const searchText = document.getElementById("search-input").value.toLowerCase();
 
-    threats.forEach(t => {
-        if (selectedSource !== "All" && t.source !== selectedSource) return;
-        if (selectedType !== "All" && t.type !== selectedType) return;
-        if (selectedRead === "Read" && t.read_flag !== 1) return;
-        if (selectedRead === "Unread" && t.read_flag !== 0) return;
-        if (searchText && !(t.title.toLowerCase().includes(searchText) || t.description.toLowerCase().includes(searchText))) return;
-
-        const card = document.createElement("div");
-        card.className = "col-md-4";
-        card.innerHTML = `
-            <div class="card threat-card ${t.read_flag ? 'read' : 'unread'}">
-                <div class="card-body">
-                    <h5 class="card-title">${t.title}</h5>
-                    <span class="badge bg-primary">${t.type || "Unknown"}</span>
-                    <span class="badge bg-secondary">${t.source || "Unknown"}</span>
-                    <p class="card-text">${t.description.substring(0, 100)}...</p>
-                    <button class="btn btn-sm btn-outline-primary btn-view">View</button>
-                    <button class="btn btn-sm btn-outline-success btn-read">${t.read_flag ? 'Mark Unread' : 'Mark Read'}</button>
-                </div>
+    threats.filter(t => {
+        if (sFilter && t.source !== sFilter) return false;
+        if (tFilter && t.type !== tFilter) return false;
+        if (rFilter && t.read_flag != rFilter) return false;
+        if (searchText && !(t.title.toLowerCase().includes(searchText) || t.description.toLowerCase().includes(searchText))) return false;
+        return true;
+    }).forEach(t => {
+        const col = document.createElement("div");
+        col.className = "col-md-4 mb-3";
+        col.innerHTML = `
+        <div class="card threat-card ${t.read_flag ? 'read' : 'unread'}">
+            <div class="card-body">
+                <h5 class="card-title">${t.title}</h5>
+                <p>
+                    <span class="badge bg-primary">${t.type || 'Unknown'}</span>
+                    <span class="badge bg-secondary">${t.source || 'Unknown'}</span>
+                </p>
+                <button class="btn btn-sm btn-outline-info view-btn">View</button>
             </div>
-        `;
-        container.appendChild(card);
-
-        card.querySelector(".btn-view").addEventListener("click", () => {
-            modalDescription.innerHTML = t.description;
-            threatModal.show();
-        });
-
-        card.querySelector(".btn-read").addEventListener("click", async () => {
-            await fetch("/api/mark_read", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({id: t.id})
-            });
-            t.read_flag = t.read_flag ? 0 : 1;
-            renderThreats();
-        });
+        </div>`;
+        col.querySelector(".view-btn").addEventListener("click", () => openModal(t));
+        container.appendChild(col);
     });
 }
 
-searchBar.addEventListener("input", renderThreats);
-filterSource.addEventListener("change", renderThreats);
-filterType.addEventListener("change", renderThreats);
-filterRead.addEventListener("change", renderThreats);
+function openModal(t) {
+    document.getElementById("modalTitle").innerText = t.title;
+    document.getElementById("modalDescription").innerText = t.description;
+    document.getElementById("modalLink").href = t.link;
+    modal.show();
 
-document.getElementById("dark-toggle").addEventListener("click", () => {
-    darkMode = !darkMode;
-    document.body.classList.toggle("dark-mode", darkMode);
+    if (!t.read_flag) {
+        fetch("/api/mark_read", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({id: t.id})
+        }).then(() => t.read_flag = 1);
+    }
+}
+
+document.getElementById("source-filter").addEventListener("change", renderThreats);
+document.getElementById("type-filter").addEventListener("change", renderThreats);
+document.getElementById("read-filter").addEventListener("change", renderThreats);
+document.getElementById("search-input").addEventListener("input", renderThreats);
+
+document.getElementById("toggle-dark").addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
 });
 
 fetchThreats();
