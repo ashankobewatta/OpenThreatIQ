@@ -1,5 +1,5 @@
-from flask import Flask, jsonify, render_template
-from utils import fetch_all_feeds, get_all_cves
+from flask import Flask, jsonify, render_template, request
+from utils import fetch_all_feeds, get_all_cves, mark_cve_read, set_cache_interval
 
 app = Flask(__name__)
 
@@ -14,12 +14,20 @@ def api_cves():
     return jsonify(cves)
 
 @app.route("/api/mark_read/<cve_id>", methods=["POST"])
-def mark_read(cve_id):
-    from utils import mark_cve_read
+def api_mark_read(cve_id):
     mark_cve_read(cve_id)
     return jsonify({"status": "ok"})
 
+@app.route("/api/set_cache_interval", methods=["POST"])
+def api_set_cache_interval():
+    minutes = request.json.get("minutes")
+    try:
+        minutes = int(minutes)
+        set_cache_interval(minutes)
+        return jsonify({"status": "ok", "minutes": minutes})
+    except:
+        return jsonify({"status": "error", "message": "Invalid value"}), 400
+
 if __name__ == "__main__":
-    # Update cache on startup
-    fetch_all_feeds()
+    fetch_all_feeds()  # refresh cache on startup
     app.run(host="0.0.0.0", port=5000, debug=True)
