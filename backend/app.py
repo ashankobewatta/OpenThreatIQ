@@ -1,7 +1,11 @@
 from flask import Flask, jsonify, render_template
 from utils import fetch_all_feeds
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
+app = Flask(
+    __name__,
+    template_folder="templates",
+    static_folder="static"   # Make sure this points to your static folder
+)
 
 @app.route("/")
 def index():
