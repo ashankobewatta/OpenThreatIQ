@@ -1,16 +1,11 @@
-import requests
-import json
-import os
-import gzip
-import io
-import sqlite3
+import requests, json, os, gzip, io, sqlite3
 from datetime import datetime, timedelta, timezone
 import xml.etree.ElementTree as ET
 
 DB_FILE = "data/threatiq.db"
+CACHE_SETTINGS_FILE = "data/cache_settings.json"
 DEFAULT_CACHE_EXPIRY_MINUTES = 30
 
-# Verified public feeds
 FEED_URLS = [
     {"name": "NVD", "url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "type": "CVE"},
     {"name": "Google Security Blog", "url": "https://security.googleblog.com/feeds/posts/default", "type": "Update"},
@@ -18,7 +13,7 @@ FEED_URLS = [
     {"name": "Bleeping Computer", "url": "https://www.bleepingcomputer.com/feed/", "type": "Update"}
 ]
 
-# ------------------ DB Initialization ------------------
+# ---------------- DB Initialization ----------------
 def init_db():
     os.makedirs("data", exist_ok=True)
     conn = sqlite3.connect(DB_FILE)
@@ -44,15 +39,33 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ------------------ Fetch All Feeds ------------------
-def fetch_all_feeds(cache_expiry_minutes=DEFAULT_CACHE_EXPIRY_MINUTES):
+# ---------------- Cache Interval ----------------
+def get_cache_interval():
+    if os.path.exists(CACHE_SETTINGS_FILE):
+        try:
+            with open(CACHE_SETTINGS_FILE, "r") as f:
+                data = json.load(f)
+                return int(data.get("cache_expiry_minutes", DEFAULT_CACHE_EXPIRY_MINUTES))
+        except:
+            return DEFAULT_CACHE_EXPIRY_MINUTES
+    return DEFAULT_CACHE_EXPIRY_MINUTES
+
+def set_cache_interval(minutes):
+    os.makedirs("data", exist_ok=True)
+    with open(CACHE_SETTINGS_FILE, "w") as f:
+        json.dump({"cache_expiry_minutes": minutes}, f)
+
+# ---------------- Fetch All Feeds ----------------
+def fetch_all_feeds():
     init_db()
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
 
-    # Check cache freshness
+    # check cache freshness
     cur.execute("SELECT MAX(published_date) FROM cve_entries")
     last_date_row = cur.fetchone()
+    cache_expiry_minutes = get_cache_interval()
+
     if last_date_row and last_date_row[0]:
         try:
             last_date = datetime.fromisoformat(last_date_row[0].replace("Z", "+00:00"))
@@ -61,7 +74,7 @@ def fetch_all_feeds(cache_expiry_minutes=DEFAULT_CACHE_EXPIRY_MINUTES):
                 print(f"[{now_utc.isoformat()}] Using cached CVEs from DB")
                 conn.close()
                 return get_all_cves()
-        except Exception:
+        except:
             pass
 
     all_entries = []
@@ -73,11 +86,9 @@ def fetch_all_feeds(cache_expiry_minutes=DEFAULT_CACHE_EXPIRY_MINUTES):
             resp.raise_for_status()
 
             if feed["url"].endswith(".gz"):
-                # NVD JSON
                 with gzip.open(io.BytesIO(resp.content), 'rt', encoding='utf-8') as f:
                     data = json.load(f)
-                items = data.get("CVE_Items", [])
-                for item in items:
+                for item in data.get("CVE_Items", []):
                     entry = {
                         "id": item["cve"]["CVE_data_meta"]["ID"],
                         "description": item["cve"]["description"]["description_data"][0]["value"],
@@ -88,7 +99,6 @@ def fetch_all_feeds(cache_expiry_minutes=DEFAULT_CACHE_EXPIRY_MINUTES):
                     save_cve_entry(entry)
                     all_entries.append(entry)
             else:
-                # RSS XML
                 xml = ET.fromstring(resp.text)
                 for item in xml.findall(".//item"):
                     entry = {
@@ -100,16 +110,14 @@ def fetch_all_feeds(cache_expiry_minutes=DEFAULT_CACHE_EXPIRY_MINUTES):
                     }
                     save_cve_entry(entry)
                     all_entries.append(entry)
-
         except requests.exceptions.SSLError as ssl_err:
-            print(f"SSL Error fetching {feed['name']}: {ssl_err}, skipping feed")
+            print(f"SSL Error fetching {feed['name']}: {ssl_err}")
         except Exception as e:
             print(f"Error fetching {feed['name']}: {e}")
 
-    # Custom user feeds
+    # custom feeds
     cur.execute("SELECT name, url, type FROM custom_feeds")
-    custom_feeds = cur.fetchall()
-    for name, url, ftype in custom_feeds:
+    for name, url, ftype in cur.fetchall():
         try:
             resp = requests.get(url, timeout=15)
             resp.raise_for_status()
@@ -130,7 +138,7 @@ def fetch_all_feeds(cache_expiry_minutes=DEFAULT_CACHE_EXPIRY_MINUTES):
     conn.close()
     return all_entries
 
-# ------------------ Save entry to DB ------------------
+# ---------------- DB helpers ----------------
 def save_cve_entry(entry):
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
@@ -141,11 +149,10 @@ def save_cve_entry(entry):
         """, (entry["id"], entry["description"], entry["published_date"], entry["type"], entry["source"]))
         conn.commit()
     except Exception as e:
-        print(f"Error saving entry {entry['id']}: {e}")
+        print(f"Error saving {entry['id']}: {e}")
     finally:
         conn.close()
 
-# ------------------ Get all CVEs from DB ------------------
 def get_all_cves():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
@@ -155,10 +162,9 @@ def get_all_cves():
     conn.close()
     return [dict(r) for r in rows]
 
-# ------------------ Add custom feed ------------------
-def add_custom_feed(name, url, ftype):
+def mark_cve_read(cve_id):
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
-    cur.execute("INSERT INTO custom_feeds (name, url, type) VALUES (?,?,?)", (name, url, ftype))
+    cur.execute("UPDATE cve_entries SET read_flag=1 WHERE id=?", (cve_id,))
     conn.commit()
     conn.close()
