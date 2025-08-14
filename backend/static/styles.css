@@ -1,49 +1,86 @@
-/* ---------- MODAL OPTIMIZATION ---------- */
-.modal-body {
-    max-height: 60vh;        /* Limit height to 60% of viewport */
-    overflow-y: auto;        /* Scroll if content is long */
-    padding: 1rem;           /* Add some padding */
-    line-height: 1.6;        /* Improve readability */
+/* ---------- LIGHT MODE ---------- */
+body {
+    background-color: #fdf6f0;
+    color: #222;
+    font-family: Arial, sans-serif;
 }
 
-.modal-body p {
-    margin-bottom: 1rem;     /* Space between paragraphs */
-    color: inherit;          /* Respect light/dark mode */
+.card {
+    background-color: #fff5f3;
+    color: #222;
+    cursor: pointer;
+    transition: transform 0.2s, background-color 0.2s, color 0.2s;
+    border-left: 4px solid transparent;
+    border-radius: 6px;
+    padding: 15px;
 }
 
-.modal-body a {
-    color: #6ab0f3;
-    text-decoration: underline;
+.card:hover {
+    transform: scale(1.02);
 }
 
-.modal-content {
-    border-radius: 0.75rem;  /* Slightly rounded corners */
+.unread {
+    border-left: 4px solid #ff6b6b;
 }
 
-.modal-header,
-.modal-footer {
-    border-color: #ddd;      /* Light border in light mode */
+.read {
+    opacity: 0.8;
+}
+
+.badge {
+    margin-right: 5px;
+}
+
+/* ---------- DARK MODE ---------- */
+body.dark-mode {
+    background-color: #1c1c1c;
+    color: #eee;
+}
+
+body.dark-mode .card {
+    background-color: #2a2a2a;
+    color: #eee;
+    border-left: 4px solid transparent;
+}
+
+body.dark-mode .card.unread {
+    border-left: 4px solid #ff6b6b;
+}
+
+body.dark-mode .badge {
+    color: #fff;
+}
+
+body.dark-mode input,
+body.dark-mode select {
+    background-color: #333;
+    color: #eee;
+    border-color: #555;
+}
+
+body.dark-mode .modal-content {
+    background-color: #2a2a2a;
+    color: #eee;
 }
 
 body.dark-mode .modal-header,
 body.dark-mode .modal-footer {
-    border-color: #444;      /* Dark border in dark mode */
+    border-color: #444;
 }
 
-/* Optional: custom scrollbar for modal */
-.modal-body::-webkit-scrollbar {
-    width: 8px;
+body.dark-mode a {
+    color: #6ab0f3;
 }
 
-.modal-body::-webkit-scrollbar-track {
-    background: transparent;
+/* ---------- MODAL ---------- */
+.modal-body {
+    white-space: pre-wrap;
+    line-height: 1.5;
 }
 
-.modal-body::-webkit-scrollbar-thumb {
-    background-color: #888;
-    border-radius: 4px;
-}
-
-body.dark-mode .modal-body::-webkit-scrollbar-thumb {
-    background-color: #555;
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 992px) {
+    .card {
+        margin-bottom: 15px;
+    }
 }
