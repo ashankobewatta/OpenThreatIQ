@@ -1,144 +1,80 @@
-let allCVEs = [];
-
-// ------------------ Load cached data ------------------
-async function loadCachedCVEs() {
-    try {
-        const response = await fetch("/api/cves");
-        allCVEs = await response.json();
-        populateFilters();
-        renderCVEs(allCVEs);
-        updateLastUpdated();
-    } catch (e) {
-        console.error("Error fetching CVEs from backend", e);
-        allCVEs = [];
-    }
+/* ---------------------- General ---------------------- */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f8f9fa;
+    color: #343a40;
+    transition: background-color 0.3s, color 0.3s;
 }
 
-// ------------------ Render CVEs ------------------
-function renderCVEs(cves) {
-    const container = document.getElementById("cve-container");
-    container.innerHTML = "";
-
-    const readList = JSON.parse(localStorage.getItem("readCVEs") || "[]");
-
-    cves.sort((a,b)=> new Date(b.published_date||0) - new Date(a.published_date||0));
-
-    cves.forEach(cve=>{
-        const div = document.createElement("div");
-        div.className = "cve-card col";
-        if(readList.includes(cve.id)) div.classList.add("read");
-
-        const type = cve.type || "Update";
-        const badgeColors = {
-            "CVE": "bg-danger",
-            "Malware": "bg-warning",
-            "Phishing": "bg-info",
-            "Exploit": "bg-primary",
-            "Update": "bg-secondary"
-        };
-        const badge = `<span class="badge ${badgeColors[type]||'bg-secondary'}">${type}</span>`;
-
-        div.innerHTML = `
-            ${badge}
-            <h5>${cve.id || "N/A"}</h5>
-            <p>${cve.description || "No description available"}</p>
-            <small>${cve.published_date ? new Date(cve.published_date).toLocaleString() : ""} | ${cve.source || "Unknown"}</small>
-        `;
-
-        div.addEventListener("click", ()=>{
-            if(!readList.includes(cve.id)){
-                readList.push(cve.id);
-                localStorage.setItem("readCVEs", JSON.stringify(readList));
-                div.classList.add("read");
-            }
-        });
-
-        container.appendChild(div);
-    });
+h1, h3, h5 {
+    margin: 0;
 }
 
-// ------------------ Populate filters ------------------
-function populateFilters() {
-    const sourceSelect = document.getElementById("filter-source");
-    const typeSelect = document.getElementById("filter-type");
-
-    const sources = Array.from(new Set(allCVEs.map(c => c.source || "Unknown"))).sort();
-    const types = Array.from(new Set(allCVEs.map(c => c.type || "Update"))).sort();
-
-    sources.forEach(s => {
-        if (![...sourceSelect.options].some(o=>o.value===s)){
-            const option = document.createElement("option");
-            option.value = s;
-            option.textContent = s;
-            sourceSelect.appendChild(option);
-        }
-    });
-
-    types.forEach(t => {
-        if (![...typeSelect.options].some(o=>o.value===t)){
-            const option = document.createElement("option");
-            option.value = t;
-            option.textContent = t;
-            typeSelect.appendChild(option);
-        }
-    });
+.container {
+    max-width: 1200px;
 }
 
-// ------------------ Filters ------------------
-document.getElementById("filter-source").addEventListener("change", applyFilters);
-document.getElementById("filter-type").addEventListener("change", applyFilters);
-document.getElementById("search").addEventListener("input", applyFilters);
-
-function applyFilters() {
-    const searchTerm = document.getElementById("search").value.toLowerCase();
-    const source = document.getElementById("filter-source").value;
-    const type = document.getElementById("filter-type").value;
-
-    const filtered = allCVEs.filter(cve => {
-        const matchesSearch = (cve.id||"").toLowerCase().includes(searchTerm) ||
-                              (cve.description||"").toLowerCase().includes(searchTerm);
-        const matchesSource = !source || (cve.source||"Unknown") === source;
-        const matchesType = !type || (cve.type||"Update") === type;
-        return matchesSearch && matchesSource && matchesType;
-    });
-
-    renderCVEs(filtered);
+/* ---------------------- Dark Mode ---------------------- */
+body.dark-mode {
+    background-color: #121212;
+    color: #e0e0e0;
 }
 
-// ------------------ Dark Mode ------------------
-document.getElementById("dark-mode-toggle").addEventListener("click", ()=>{
-    document.body.classList.toggle("dark");
-});
-
-// ------------------ Update cache interval ------------------
-document.getElementById("update-cache-btn").addEventListener("click", async ()=>{
-    const interval = parseInt(document.getElementById("cache-interval").value);
-    if(isNaN(interval) || interval < 1) return alert("Invalid interval");
-
-    try {
-        const resp = await fetch(`/api/update_cache?minutes=${interval}`);
-        if(resp.ok){
-            alert("Cache updated!");
-            loadCachedCVEs();
-        } else {
-            alert("Failed to update cache");
-        }
-    } catch(e){
-        console.error("Error updating cache", e);
-        alert("Failed to update cache");
-    }
-});
-
-// ------------------ Last Updated ------------------
-function updateLastUpdated(){
-    if(allCVEs.length === 0) return;
-    const latest = allCVEs.reduce((a,b)=>{
-        const da = new Date(a.published_date||0);
-        const db = new Date(b.published_date||0);
-        return da>db ? a : b;
-    });
-    document.getElementById("last-updated").textContent = `Last updated: ${latest.published_date ? new Date(latest.published_date).toLocaleString() : "Unknown"}`;
+body.dark-mode .cve-card {
+    background-color: #1e1e1e;
+    color: #e0e0e0;
 }
 
-// ------------------ Initialize ------------------
-loadCachedCVEs();
+body.dark-mode .badge {
+    opacity: 0.9;
+}
+
+/* ---------------------- CVE Card ---------------------- */
+.cve-card {
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 15px;
+    box-shadow: 0 3px 6px rgba(0,0,0,0.1);
+    transition: transform 0.2s, box-shadow 0.2s;
+    cursor: pointer;
+}
+
+.cve-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+}
+
+.cve-card.read {
+    opacity: 0.6;
+}
+
+/* ---------------------- Badges ---------------------- */
+.badge {
+    margin-right: 5px;
+    font-size: 0.8rem;
+}
+
+/* Badge colors by type */
+.badge.bg-primary { background-color: #a8dadc; color: #1d3557; }   /* CVE */
+.badge.bg-success { background-color: #caffbf; color: #2a9d8f; }  /* Malware */
+.badge.bg-warning { background-color: #ffe5b4; color: #f4a261; }  /* Phishing */
+.badge.bg-danger  { background-color: #ffb3b3; color: #e63946; }  /* Exploit */
+.badge.bg-secondary { background-color: #d3d3d3; color: #495057; } /* Source badge fallback */
+
+/* ---------------------- Filters & Inputs ---------------------- */
+.form-select, .form-control {
+    border-radius: 5px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-select:focus, .form-control:focus {
+    border-color: #6c757d;
+    box-shadow: 0 0 0 0.2rem rgba(108,117,125,0.25);
+}
+
+/* ---------------------- Responsive Grid ---------------------- */
+#cve-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 15px;
+}
