@@ -7,9 +7,8 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 
 DB_FILE = "data/threatiq.db"
-DEFAULT_CACHE_EXPIRY_MINUTES = 30  # default cache expiry
+DEFAULT_CACHE_EXPIRY_MINUTES = 30
 
-# Verified free public feeds
 FEED_URLS = [
     {"name": "NVD", "url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "type": "CVE"},
     {"name": "Beeping Computer", "url": "https://www.beepingcomputer.com/feed/", "type": "Update"},
@@ -17,7 +16,6 @@ FEED_URLS = [
     {"name": "Microsoft Security", "url": "https://msrc.microsoft.com/update-guide/rss", "type": "Update"}
 ]
 
-# ------------------ DB Setup ------------------
 def init_db():
     os.makedirs("data", exist_ok=True)
     conn = sqlite3.connect(DB_FILE)
@@ -43,20 +41,18 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ------------------ Fetch all feeds ------------------
 def fetch_all_feeds(cache_expiry_minutes=DEFAULT_CACHE_EXPIRY_MINUTES):
     init_db()
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
 
-    # Check cache freshness
+    # check cache freshness
     cur.execute("SELECT MAX(published_date) FROM cve_entries")
     last_date_row = cur.fetchone()
     if last_date_row and last_date_row[0]:
         last_date = datetime.fromisoformat(last_date_row[0].replace("Z", "+00:00"))
         now_utc = datetime.now(timezone.utc)
-        expiry_delta = timedelta(minutes=cache_expiry_minutes)
-        if now_utc - last_date < expiry_delta:
+        if now_utc - last_date < timedelta(minutes=cache_expiry_minutes):
             print(f"[{now_utc.isoformat()}] Using cached CVEs from DB")
             conn.close()
             return get_all_cves()
@@ -98,7 +94,7 @@ def fetch_all_feeds(cache_expiry_minutes=DEFAULT_CACHE_EXPIRY_MINUTES):
         except Exception as e:
             print(f"Error fetching {feed['name']}: {e}")
 
-    # Fetch custom feeds
+    # custom feeds
     cur.execute("SELECT name, url, type FROM custom_feeds")
     custom_feeds = cur.fetchall()
     for name, url, ftype in custom_feeds:
@@ -123,7 +119,6 @@ def fetch_all_feeds(cache_expiry_minutes=DEFAULT_CACHE_EXPIRY_MINUTES):
     conn.close()
     return all_entries
 
-# ------------------ Save CVE ------------------
 def save_cve_entry(entry):
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
@@ -138,7 +133,6 @@ def save_cve_entry(entry):
     finally:
         conn.close()
 
-# ------------------ Get all CVEs from DB ------------------
 def get_all_cves():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
@@ -148,7 +142,6 @@ def get_all_cves():
     conn.close()
     return [dict(r) for r in rows]
 
-# ------------------ Add custom feed ------------------
 def add_custom_feed(name, url, ftype):
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
