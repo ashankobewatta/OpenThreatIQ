@@ -1,6 +1,7 @@
 import requests, json, os, gzip, io, csv, feedparser
 from datetime import datetime, timedelta
 from io import StringIO
+import csv
 
 CACHE_FILE = "data/cve_cache.json"
 CACHE_EXPIRY_HOURS = 24
@@ -119,6 +120,20 @@ def fetch_msrc():
             "source": "Microsoft",
             "type": "CVE"
         })
+    return entries
+
+def load_temp_csv():
+    entries = []
+    with open("data/temp_feeds.csv", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            entries.append({
+                "id": row["id"],
+                "description": row["description"],
+                "publishedDate": row.get("publishedDate") or datetime.now().isoformat(),
+                "source": row.get("source") or "Unknown",
+                "type": row.get("type") or "Unknown"
+            })
     return entries
 
 # ----------------- Aggregate Feeds -----------------
