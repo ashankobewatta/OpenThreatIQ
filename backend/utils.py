@@ -1,151 +1,109 @@
 import requests
-import sqlite3
 import feedparser
+import sqlite3
 import json
 import gzip
 import io
 from datetime import datetime, timedelta
-from bs4 import BeautifulSoup
+from pathlib import Path
 
-DB_FILE = "data/threats.db"
-CACHE_EXPIRY_MINUTES = 30  # Default; user-configurable
+DB_FILE = Path("data/cve_data.db")
+CACHE_EXPIRY_MINUTES_DEFAULT = 30
 
-# Verified public feeds
-FEEDS = [
-    {"url": "https://www.bleepingcomputer.com/feed/", "source": "BleepingComputer", "type": "Malware", "format": "rss"},
-    {"url": "https://feeds.feedburner.com/GoogleChromeReleases", "source": "Google Chrome", "type": "Patch", "format": "rss"},
-    {"url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "source": "NVD", "type": "CVE", "format": "json"}
-]
-
-# Initialize DB
-def init_db():
+# -----------------------------
+# SQLite helper
+# -----------------------------
+def get_db_connection():
     conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS threats (
+    conn.row_factory = sqlite3.Row
+    return conn
+
+def init_db():
+    conn = get_db_connection()
+    conn.execute('''
+        CREATE TABLE IF NOT EXISTS cves (
             id TEXT PRIMARY KEY,
-            title TEXT,
             description TEXT,
-            link TEXT,
             source TEXT,
             type TEXT,
             published_date TEXT,
             read_flag INTEGER DEFAULT 0
         )
     ''')
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS config (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-    ''')
     conn.commit()
     conn.close()
 
+# -----------------------------
+# Feed sources (verified)
+# -----------------------------
+FEEDS = [
+    {"url": "https://www.bleepingcomputer.com/feed/", "source": "BleepingComputer", "type": "Malware"},
+    {"url": "https://feeds.feedburner.com/GoogleChromeReleases", "source": "Google Chrome", "type": "Patch"},
+    {"url": "https://services.nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "source": "NVD", "type": "CVE", "json": True},
+]
+
+# User added feeds (can be dynamically updated in DB or config)
+USER_FEEDS = []  # example: {"url": "...", "source": "...", "type": "..."}
+
+# -----------------------------
 # Fetch all feeds
-def fetch_all_feeds():
+# -----------------------------
+def fetch_all_feeds(interval=CACHE_EXPIRY_MINUTES_DEFAULT):
     init_db()
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
+    conn = get_db_connection()
 
     # Check last update
-    c.execute("SELECT value FROM config WHERE key='last_update'")
-    row = c.fetchone()
-    now = datetime.utcnow()
-    if row:
-        last_update = datetime.fromisoformat(row[0])
-        if now - last_update < timedelta(minutes=get_cache_interval()):
-            print(f"[{datetime.now().isoformat()}] Using cached threats from DB")
+    try:
+        mtime = DB_FILE.stat().st_mtime
+        last_date = datetime.fromtimestamp(mtime)
+        if datetime.now() - last_date < timedelta(minutes=interval):
+            print(f"[{datetime.now().isoformat()}] Using cached CVEs in database")
             conn.close()
-            return get_all_threats()
+            return
+    except FileNotFoundError:
+        pass
 
-    print(f"[{datetime.now().isoformat()}] Updating feeds...")
-    for feed in FEEDS:
+    print(f"[{datetime.now().isoformat()}] Fetching feeds...")
+
+    all_feeds = FEEDS + USER_FEEDS
+    for feed in all_feeds:
+        url = feed["url"]
+        source = feed.get("source", "Unknown")
+        ctype = feed.get("type", "Unknown")
+        is_json = feed.get("json", False)
+        print(f"Fetching feed: {source}")
+
         try:
-            if feed["format"] == "rss":
-                data = fetch_rss_feed(feed["url"])
-                for item in data:
-                    upsert_threat(c, item["id"], item["title"], item["description"], item["link"], feed["source"], feed["type"], item["published_date"])
-            elif feed["format"] == "json":
-                data = fetch_nvd_json(feed["url"])
-                for item in data:
-                    upsert_threat(c, item["id"], item["id"], item["description"], "", feed["source"], feed["type"], item["publishedDate"])
+            if is_json:  # NVD JSON
+                resp = requests.get(url, headers={"User-Agent": "OpenThreatIQ/1.0"})
+                resp.raise_for_status()
+                with gzip.open(io.BytesIO(resp.content), 'rt', encoding='utf-8') as f:
+                    data = json.load(f)
+                for item in data.get("CVE_Items", []):
+                    cve_id = item["cve"]["CVE_data_meta"]["ID"]
+                    desc = item["cve"]["description"]["description_data"][0]["value"]
+                    pub_date = item["publishedDate"]
+                    upsert_cve(conn, cve_id, desc, source, ctype, pub_date)
+            else:  # RSS
+                parsed = feedparser.parse(url)
+                for entry in parsed.entries:
+                    cve_id = entry.get("id") or entry.get("link")
+                    desc = entry.get("content")[0].value if "content" in entry else entry.get("summary", "")
+                    pub_date = entry.get("published", datetime.now().isoformat())
+                    upsert_cve(conn, cve_id, desc, source, ctype, pub_date)
         except Exception as e:
-            print(f"Error fetching {feed['source']}: {e}")
+            print(f"Error fetching {source}: {e}")
 
-    c.execute("REPLACE INTO config(key, value) VALUES (?, ?)", ("last_update", now.isoformat()))
     conn.commit()
     conn.close()
-    return get_all_threats()
+    print(f"[{datetime.now().isoformat()}] Feeds updated.")
 
-def upsert_threat(cursor, tid, title, description, link, source, ttype, pubdate):
-    cursor.execute('''
-        INSERT OR REPLACE INTO threats(id, title, description, link, source, type, published_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (tid, title, description, link, source, ttype, pubdate))
+# -----------------------------
+# Upsert CVE into DB
+# -----------------------------
+def upsert_cve(conn, cve_id, description, source, ctype, pub_date):
+    conn.execute('''
+        INSERT OR REPLACE INTO cves (id, description, source, type, published_date, read_flag)
+        VALUES (?, ?, ?, ?, ?, COALESCE((SELECT read_flag FROM cves WHERE id = ?), 0))
+    ''', (cve_id, description, source, ctype, pub_date, cve_id))
 
-def fetch_rss_feed(url):
-    headers = {"User-Agent": "OpenThreatIQ/1.0"}
-    resp = requests.get(url, headers=headers, timeout=10)
-    resp.raise_for_status()
-    feed = feedparser.parse(resp.content)
-    items = []
-    for entry in feed.entries:
-        content = entry.get("content", [{}])[0].get("value") or entry.get("summary", "")
-        content = BeautifulSoup(content, "html.parser").get_text()
-        items.append({
-            "id": entry.get("id") or entry.get("link"),
-            "title": entry.get("title"),
-            "description": content,
-            "link": entry.get("link"),
-            "published_date": entry.get("published") or entry.get("updated") or ""
-        })
-    return items
-
-def fetch_nvd_json(url):
-    headers = {"User-Agent": "OpenThreatIQ/1.0"}
-    resp = requests.get(url, headers=headers, timeout=10)
-    resp.raise_for_status()
-    with gzip.open(io.BytesIO(resp.content), 'rt', encoding='utf-8') as f:
-        data = json.load(f)
-    items = []
-    for item in data.get("CVE_Items", []):
-        cve_id = item["cve"]["CVE_data_meta"]["ID"]
-        desc = item["cve"]["description"]["description_data"][0]["value"]
-        pubdate = item.get("publishedDate", "")
-        items.append({"id": cve_id, "description": desc, "publishedDate": pubdate})
-    return items
-
-def get_all_threats():
-    conn = sqlite3.connect(DB_FILE)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    c.execute("SELECT * FROM threats ORDER BY published_date DESC")
-    rows = [dict(row) for row in c.fetchall()]
-    conn.close()
-    return rows
-
-def mark_read(threat_id):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("UPDATE threats SET read_flag=1 WHERE id=?", (threat_id,))
-    conn.commit()
-    conn.close()
-
-def add_user_feed(url, source, ttype):
-    FEEDS.append({"url": url, "source": source, "type": ttype, "format": "rss"})
-
-def get_cache_interval():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT value FROM config WHERE key='cache_interval'")
-    row = c.fetchone()
-    conn.close()
-    return int(row[0]) if row else CACHE_EXPIRY_MINUTES
-
-def set_cache_interval(minutes):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("REPLACE INTO config(key, value) VALUES (?, ?)", ("cache_interval", str(minutes)))
-    conn.commit()
-    conn.close()
