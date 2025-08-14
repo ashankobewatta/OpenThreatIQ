@@ -1,11 +1,15 @@
 from flask import Flask, jsonify, render_template, request
-from utils import fetch_all_feeds, add_custom_feed, get_all_cves
+from utils import fetch_all_feeds, get_all_cves, add_custom_feed
 
 app = Flask(__name__)
 
+# Default cache expiry (minutes)
+DEFAULT_CACHE_MINUTES = 30
+
 @app.route("/")
 def index():
-    return render_template("index.html")
+    cves = get_all_cves()
+    return render_template("index.html", cves=cves)
 
 @app.route("/api/cves")
 def api_cves():
@@ -18,11 +22,17 @@ def api_add_feed():
     name = data.get("name")
     url = data.get("url")
     ftype = data.get("type", "Update")
-    if name and url:
-        add_custom_feed(name, url, ftype)
-        return jsonify({"status": "success"}), 201
-    return jsonify({"status": "error", "message": "Missing name or url"}), 400
+    if not name or not url:
+        return jsonify({"message": "Missing name or url"}), 400
+    add_custom_feed(name, url, ftype)
+    return jsonify({"message": "Feed added"}), 201
+
+@app.route("/api/update_cache")
+def api_update_cache():
+    minutes = request.args.get("minutes", default=DEFAULT_CACHE_MINUTES, type=int)
+    fetch_all_feeds(cache_expiry_minutes=minutes)
+    return jsonify({"message": f"Cache refreshed with {minutes} minutes expiry"}), 200
 
 if __name__ == "__main__":
-    fetch_all_feeds()  # update cache on startup
+    fetch_all_feeds(cache_expiry_minutes=DEFAULT_CACHE_MINUTES)  # initial cache on startup
     app.run(debug=True)
