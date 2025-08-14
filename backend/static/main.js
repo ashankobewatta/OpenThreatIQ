@@ -1,96 +1,95 @@
-let allThreats = [];
+let threats = [];
+let modal = new bootstrap.Modal(document.getElementById('threatModal'));
 
 async function fetchThreats() {
     const res = await fetch("/api/threats");
-    allThreats = await res.json();
+    threats = await res.json();
     populateFilters();
-    renderThreats();
+    displayThreats();
 }
 
 function populateFilters() {
-    const sourceSelect = document.getElementById("filterSource");
-    const typeSelect = document.getElementById("filterType");
-
-    const sources = Array.from(new Set(allThreats.map(t => t.source || "Unknown")));
-    const types = Array.from(new Set(allThreats.map(t => t.type || "Unknown")));
-
-    sources.forEach(s => {
-        if (![...sourceSelect.options].some(opt => opt.value === s)) {
-            const opt = document.createElement("option"); opt.value = s; opt.text = s;
-            sourceSelect.appendChild(opt);
-        }
+    const sourceSet = new Set();
+    const typeSet = new Set();
+    threats.forEach(t => {
+        sourceSet.add(t.source || "Unknown");
+        typeSet.add(t.type || "Unknown");
     });
-
-    types.forEach(t => {
-        if (![...typeSelect.options].some(opt => opt.value === t)) {
-            const opt = document.createElement("option"); opt.value = t; opt.text = t;
-            typeSelect.appendChild(opt);
-        }
-    });
+    const sourceFilter = document.getElementById("sourceFilter");
+    const typeFilter = document.getElementById("typeFilter");
+    sourceFilter.innerHTML = `<option value="">All Sources</option>` + [...sourceSet].map(s => `<option value="${s}">${s}</option>`).join('');
+    typeFilter.innerHTML = `<option value="">All Types</option>` + [...typeSet].map(s => `<option value="${s}">${s}</option>`).join('');
 }
 
-function renderThreats() {
-    const container = document.getElementById("threat-container");
+function displayThreats() {
+    const container = document.getElementById("cve-container");
     container.innerHTML = "";
-    const sourceFilter = document.getElementById("filterSource").value;
-    const typeFilter = document.getElementById("filterType").value;
-    const readFilter = document.getElementById("filterRead").value;
-    const searchTerm = document.getElementById("searchInput").value.toLowerCase();
 
-    allThreats.filter(t => {
-        const matchesSource = !sourceFilter || t.source === sourceFilter;
-        const matchesType = !typeFilter || t.type === typeFilter;
-        const matchesRead = !readFilter || (readFilter === "read" ? t.read_flag : !t.read_flag);
-        const matchesSearch = !searchTerm || t.title.toLowerCase().includes(searchTerm) || t.description.toLowerCase().includes(searchTerm);
-        return matchesSource && matchesType && matchesRead && matchesSearch;
-    }).forEach(threat => {
-        const div = document.createElement("div");
-        div.className = `card col-12 p-3 ${threat.read_flag ? 'read' : 'unread'}`;
-        const summary = threat.description.length > 150 ? threat.description.slice(0, 150) + "..." : threat.description;
+    const search = document.getElementById("searchInput").value.toLowerCase();
+    const sourceF = document.getElementById("sourceFilter").value;
+    const typeF = document.getElementById("typeFilter").value;
+    const readF = document.getElementById("readFilter").value;
 
-        div.innerHTML = `
-            <h5>${threat.title}</h5>
-            <p>${summary}</p>
-            <span class="badge bg-primary">${threat.type || "Unknown"}</span>
-            <span class="badge bg-secondary">${threat.source || "Unknown"}</span>
-            <small>${threat.published_date}</small>
-            <div class="mt-2">
-                <button class="btn btn-sm btn-info view-more">View More</button>
-                <a href="${threat.link}" target="_blank" class="btn btn-sm btn-secondary">Go to Source</a>
+    threats.forEach(t => {
+        if (sourceF && t.source !== sourceF) return;
+        if (typeF && t.type !== typeF) return;
+        if (readF && t.read_flag != readF) return;
+        if (search && !t.title.toLowerCase().includes(search) && !t.description.toLowerCase().includes(search)) return;
+
+        const card = document.createElement("div");
+        card.className = `card p-3 mb-2 ${t.read_flag ? "read" : "unread"}`;
+        card.innerHTML = `
+            <h5>${t.title}</h5>
+            <div>
+                <span class="badge bg-info">${t.type || "Unknown"}</span>
+                <span class="badge bg-secondary">${t.source || "Unknown"}</span>
             </div>
+            <p>${t.description.slice(0, 150)}${t.description.length>150?"...":""}</p>
         `;
+        card.addEventListener("click", async () => {
+            // Mark as read
+            await fetch(`/api/mark_read/${t.id}`, {method:"POST"});
+            t.read_flag = 1;
+            displayThreats();
 
-        div.querySelector(".view-more").addEventListener("click", () => {
-            document.getElementById("modalContent").innerHTML = `
-                <h5>${threat.title}</h5>
-                <p>${threat.description}</p>
-                <p><strong>Source:</strong> ${threat.source || "Unknown"}</p>
-                <p><strong>Type:</strong> ${threat.type || "Unknown"}</p>
-                <p><strong>Published:</strong> ${threat.published_date}</p>
-                <a href="${threat.link}" target="_blank">View Original</a>
-            `;
-            const modal = new bootstrap.Modal(document.getElementById('threatModal'));
+            // Show modal
+            document.getElementById("modalTitle").textContent = t.title;
+            document.getElementById("modalBody").textContent = t.description;
+            document.getElementById("modalLink").href = t.link || "#";
             modal.show();
-            markRead(threat.id);
-            div.classList.remove('unread'); div.classList.add('read');
         });
-
-        container.appendChild(div);
+        container.appendChild(card);
     });
 }
 
-// Event listeners
-document.getElementById("filterSource").addEventListener("change", renderThreats);
-document.getElementById("filterType").addEventListener("change", renderThreats);
-document.getElementById("filterRead").addEventListener("change", renderThreats);
-document.getElementById("searchInput").addEventListener("input", renderThreats);
-
+// Dark mode toggle
 document.getElementById("darkModeToggle").addEventListener("click", () => {
     document.body.classList.toggle("dark-mode");
 });
 
-async function markRead(id) {
-    await fetch(`/api/mark_read/${id}`);
-}
+// Filters & search
+document.getElementById("searchInput").addEventListener("input", displayThreats);
+document.getElementById("sourceFilter").addEventListener("change", displayThreats);
+document.getElementById("typeFilter").addEventListener("change", displayThreats);
+document.getElementById("readFilter").addEventListener("change", displayThreats);
 
+// Add custom feed
+document.getElementById("addFeedBtn").addEventListener("click", async () => {
+    const name = document.getElementById("newFeedName").value.trim();
+    const url = document.getElementById("newFeedURL").value.trim();
+    if (!name || !url) return alert("Enter name and URL");
+    await fetch("/api/add_feed", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({name,url})});
+    document.getElementById("newFeedName").value="";
+    document.getElementById("newFeedURL").value="";
+    await fetchThreats();
+});
+
+// Set cache interval
+document.getElementById("cacheInterval").addEventListener("change", async () => {
+    const minutes = parseInt(document.getElementById("cacheInterval").value);
+    await fetch("/api/set_cache_interval", {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({minutes})});
+    await fetchThreats();
+});
+
+// Initial load
 fetchThreats();
