@@ -1,104 +1,98 @@
-const threatContainer = document.getElementById("threat-container");
-const searchInput = document.getElementById("search-input");
-const sourceFilter = document.getElementById("source-filter");
-const typeFilter = document.getElementById("type-filter");
-const readFilter = document.getElementById("read-filter");
-const darkModeToggle = document.getElementById("dark-mode-toggle");
+document.addEventListener("DOMContentLoaded", function () {
+    const searchInput = document.getElementById("search-input");
+    const typeFilter = document.getElementById("type-filter");
+    const sourceFilter = document.getElementById("source-filter");
+    const readFilter = document.getElementById("read-filter");
+    const darkModeToggle = document.getElementById("dark-mode-toggle");
+    const threatsContainer = document.getElementById("threats-container");
 
-let threats = [];
+    let threatsData = [];
 
-// Fetch threats from backend
-async function fetchThreats() {
-    const res = await fetch("/api/threats");
-    threats = await res.json();
-    populateFilters();
-    renderThreats();
-}
-
-// Render filters dynamically
-function populateFilters() {
-    const sources = new Set(threats.map(t => t.source || "Unknown"));
-    const types = new Set(threats.map(t => t.type || "Unknown"));
-
-    sourceFilter.innerHTML = `<option value="">All Sources</option>` +
-        [...sources].map(s => `<option value="${s}">${s}</option>`).join("");
-
-    typeFilter.innerHTML = `<option value="">All Types</option>` +
-        [...types].map(t => `<option value="${t}">${t}</option>`).join("");
-
-    readFilter.innerHTML = `
-        <option value="">All</option>
-        <option value="read">Read</option>
-        <option value="unread">Unread</option>
-    `;
-}
-
-// Render threats
-function renderThreats() {
-    const searchText = searchInput.value.toLowerCase();
-    const sourceVal = sourceFilter.value;
-    const typeVal = typeFilter.value;
-    const readVal = readFilter.value;
-
-    threatContainer.innerHTML = "";
-
-    threats
-        .filter(t => 
-            (!sourceVal || t.source === sourceVal) &&
-            (!typeVal || t.type === typeVal) &&
-            (!readVal || (readVal === "read" ? t.read_flag : !t.read_flag)) &&
-            (t.title.toLowerCase().includes(searchText) || t.description.toLowerCase().includes(searchText))
-        )
-        .forEach(t => {
-            const card = document.createElement("div");
-            card.className = `card ${t.read_flag ? "read" : "unread"} mb-2 p-2`;
-            card.innerHTML = `
-                <h5>${t.title}</h5>
-                <p>${t.description.slice(0, 200)}${t.description.length > 200 ? "..." : ""}</p>
-                <div>
-                    <span class="badge bg-info">${t.source}</span>
-                    <span class="badge bg-warning text-dark">${t.type}</span>
-                </div>
-            `;
-
-            // Click to open modal
-            card.addEventListener("click", () => showModal(t));
-
-            threatContainer.appendChild(card);
-        });
-}
-
-// Show modal with full description
-function showModal(threat) {
-    const modalTitle = document.getElementById("modal-title");
-    const modalBody = document.getElementById("modal-body");
-    const modalLink = document.getElementById("modal-link");
-
-    modalTitle.textContent = threat.title;
-    modalBody.textContent = threat.description;
-    modalLink.href = threat.link;
-
-    // Mark as read instantly
-    if (!threat.read_flag) {
-        fetch(`/api/mark_read/${threat.id}`, { method: "POST" })
-            .then(() => {
-                threat.read_flag = 1;
+    // Fetch and render threats
+    function fetchThreats() {
+        fetch("/api/threats")
+            .then(res => res.json())
+            .then(data => {
+                threatsData = data;
                 renderThreats();
+            })
+            .catch(err => console.error("Error fetching threats:", err));
+    }
+
+    // Render threat cards
+    function renderThreats() {
+        threatsContainer.innerHTML = "";
+        const searchText = searchInput.value.toLowerCase();
+        const typeValue = typeFilter.value;
+        const sourceValue = sourceFilter.value;
+        const readValue = readFilter.value;
+
+        threatsData
+            .filter(t => {
+                const matchesSearch =
+                    t.title.toLowerCase().includes(searchText) ||
+                    t.description.toLowerCase().includes(searchText);
+
+                const matchesType = typeValue === "" || t.type === typeValue;
+                const matchesSource = sourceValue === "" || t.source === sourceValue;
+                const matchesRead =
+                    readValue === "" ||
+                    (readValue === "unread" && !t.read) ||
+                    (readValue === "read" && t.read);
+
+                return matchesSearch && matchesType && matchesSource && matchesRead;
+            })
+            .forEach(t => {
+                const card = document.createElement("div");
+                card.className = `card mb-3 ${t.read ? "read" : "unread"}`;
+                card.innerHTML = `
+                    <div class="card-body">
+                        <h5 class="card-title">${t.title}</h5>
+                        <span class="badge bg-info">${t.type || "Unknown"}</span>
+                        <span class="badge bg-secondary">${t.source || "Unknown"}</span>
+                        <p class="card-text">${t.description.substring(0, 150)}${t.description.length > 150 ? "..." : ""}</p>
+                        <small class="text-muted">Published: ${t.published}</small>
+                    </div>
+                `;
+
+                // Click to open full modal
+                card.addEventListener("click", () => {
+                    markRead(t.id);
+                    document.getElementById("modal-title").innerText = t.title;
+                    document.getElementById("modal-body").innerText = t.full_description || t.description;
+                    document.getElementById("modal-source-btn").href = t.link;
+                    new bootstrap.Modal(document.getElementById("detailsModal")).show();
+                });
+
+                threatsContainer.appendChild(card);
             });
     }
 
-    new bootstrap.Modal(document.getElementById("threatModal")).show();
-}
+    // Mark as read instantly
+    function markRead(id) {
+        const threat = threatsData.find(t => t.id === id);
+        if (threat) threat.read = true;
+        renderThreats();
 
-// Event listeners
-searchInput.addEventListener("input", renderThreats);
-sourceFilter.addEventListener("change", renderThreats);
-typeFilter.addEventListener("change", renderThreats);
-readFilter.addEventListener("change", renderThreats);
+        fetch(`/api/mark_read/${id}`, { method: "POST" })
+            .catch(err => console.error("Error marking read:", err));
+    }
 
-darkModeToggle.addEventListener("click", () => {
-    document.body.classList.toggle("dark-mode");
+    // Filter & search listeners
+    searchInput.addEventListener("input", renderThreats);
+    typeFilter.addEventListener("change", renderThreats);
+    sourceFilter.addEventListener("change", renderThreats);
+    readFilter.addEventListener("change", renderThreats);
+
+    // Dark mode toggle
+    darkModeToggle.addEventListener("click", function () {
+        document.body.classList.toggle("dark-mode");
+        localStorage.setItem("darkMode", document.body.classList.contains("dark-mode"));
+    });
+
+    if (localStorage.getItem("darkMode") === "true") {
+        document.body.classList.add("dark-mode");
+    }
+
+    fetchThreats();
 });
-
-// Initial fetch
-fetchThreats();
