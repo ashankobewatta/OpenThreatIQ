@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 
 DB_FILE = "data/threats.db"
-CACHE_EXPIRY_MINUTES = 30  # Default cache interval
+CACHE_EXPIRY_MINUTES = 30  # Default
 
 FEEDS = [
     {"url": "https://www.bleepingcomputer.com/feed/", "source": "BleepingComputer", "type": "Malware", "format": "rss"},
@@ -17,12 +17,13 @@ FEEDS = [
     {"url": "https://gemini.google.com/feed/", "source": "Google Gemini", "type": "Research", "format": "rss"}  # Example
 ]
 
-# Domains with full content CSS selectors
-TRUSTED_FULL_CONTENT_SELECTORS = {
-    "bleepingcomputer.com": "div.article-content",
-    "gemini.google.com": "div.post-body"  # Update with actual Gemini article selector
-}
-
+# Common fallback selectors for full article
+FALLBACK_SELECTORS = [
+    "article",
+    "div.post-body",
+    "div.content",
+    "div.article-content"
+]
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -43,7 +44,6 @@ def init_db():
     )''')
     conn.commit()
     conn.close()
-
 
 def fetch_all_feeds():
     init_db()
@@ -79,11 +79,9 @@ def fetch_all_feeds():
     conn.close()
     return get_all_threats()
 
-
 def upsert_threat(cursor, tid, title, description, link, source, ttype, pubdate):
     cursor.execute('''INSERT OR REPLACE INTO threats(id, title, description, link, source, type, published_date)
                       VALUES (?, ?, ?, ?, ?, ?, ?)''', (tid, title, description, link, source, ttype, pubdate))
-
 
 def fetch_rss_feed(url):
     headers = {"User-Agent": "OpenThreatIQ/1.0"}
@@ -93,23 +91,26 @@ def fetch_rss_feed(url):
     items = []
 
     for entry in feed.entries:
-        # Default to RSS summary
+        # Default summary
         content = entry.get("content", [{}])[0].get("value") or entry.get("summary", "")
         content = BeautifulSoup(content, "html.parser").get_text()
 
-        # Fetch full article for trusted sources
-        for domain, selector in TRUSTED_FULL_CONTENT_SELECTORS.items():
-            if domain in entry.link:
-                try:
-                    page_resp = requests.get(entry.link, headers=headers, timeout=10)
-                    page_resp.raise_for_status()
-                    soup = BeautifulSoup(page_resp.text, "html.parser")
-                    article = soup.select_one(selector)
-                    if article:
-                        content = article.get_text(separator="\n").strip()
-                except Exception as e:
-                    print(f"Failed to fetch full article from {entry.link}: {e}")
-                break
+        # Attempt to fetch full article
+        try:
+            page_resp = requests.get(entry.link, headers=headers, timeout=10)
+            page_resp.raise_for_status()
+            soup = BeautifulSoup(page_resp.text, "html.parser")
+
+            full_text = None
+            for selector in FALLBACK_SELECTORS:
+                el = soup.select_one(selector)
+                if el:
+                    full_text = el.get_text(separator="\n").strip()
+                    break
+            if full_text:
+                content = full_text
+        except Exception as e:
+            print(f"Failed to fetch full article from {entry.link}: {e}")
 
         items.append({
             "id": entry.get("id") or entry.get("link"),
@@ -120,7 +121,6 @@ def fetch_rss_feed(url):
         })
 
     return items
-
 
 def fetch_nvd_json(url):
     headers = {"User-Agent": "OpenThreatIQ/1.0"}
@@ -136,7 +136,6 @@ def fetch_nvd_json(url):
         items.append({"id": cve_id, "description": desc, "publishedDate": pubdate})
     return items
 
-
 def get_all_threats():
     conn = sqlite3.connect(DB_FILE)
     conn.row_factory = sqlite3.Row
@@ -146,7 +145,6 @@ def get_all_threats():
     conn.close()
     return rows
 
-
 def mark_read(threat_id):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -154,11 +152,9 @@ def mark_read(threat_id):
     conn.commit()
     conn.close()
 
-
 def add_user_feed(url, source="Custom", ttype="Unknown"):
     FEEDS.append({"url": url, "source": source, "type": ttype, "format": "rss"})
     fetch_all_feeds()
-
 
 def get_cache_interval():
     conn = sqlite3.connect(DB_FILE)
@@ -167,7 +163,6 @@ def get_cache_interval():
     row = c.fetchone()
     conn.close()
     return int(row[0]) if row else CACHE_EXPIRY_MINUTES
-
 
 def set_cache_interval(minutes):
     conn = sqlite3.connect(DB_FILE)
