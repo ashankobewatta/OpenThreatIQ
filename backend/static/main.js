@@ -75,7 +75,7 @@ function showModal(threat) {
     document.getElementById("modal-title").textContent = threat.title;
 
     // Preserve line breaks and full content
-    document.getElementById("modal-body").innerHTML = threat.description
+    document.getElementById("modal-body").innerHTML = formatDescription(threat.description);
         .replace(/\n/g, "<br>");
 
     // Link to original source
@@ -98,6 +98,18 @@ function showModal(threat) {
 
     new bootstrap.Modal(document.getElementById("threatModal")).show();
 }
+
+function formatDescription(desc) {
+    // Remove excessive line breaks
+    desc = desc.replace(/\n{2,}/g, "\n");
+
+    // Split into paragraphs
+    const paragraphs = desc.split("\n").map(p => p.trim()).filter(p => p.length > 0);
+    
+    // Wrap in <p>
+    return paragraphs.map(p => `<p>${p}</p>`).join("");
+}
+
 
 // Set cache interval
 cacheIntervalSelect.addEventListener("change", () => {
