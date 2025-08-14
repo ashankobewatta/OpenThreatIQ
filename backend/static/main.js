@@ -1,135 +1,108 @@
-document.addEventListener("DOMContentLoaded", () => {
-    const cveContainer = document.getElementById("cve-container");
-    const searchInput = document.getElementById("search-bar");
-    const sourceFilter = document.getElementById("source-filter");
-    const typeFilter = document.getElementById("type-filter");
-    const readFilter = document.getElementById("read-filter");
-    const darkToggle = document.getElementById("dark-toggle");
-    const cacheIntervalSelect = document.getElementById("cache-interval");
-    const addFeedForm = document.getElementById("add-feed-form");
+let threats = [];
+let modal = new bootstrap.Modal(document.getElementById('threatModal'));
 
-    let threats = [];
+async function fetchThreats() {
+    const res = await fetch("/api/threats");
+    threats = await res.json();
+    renderFilters();
+    renderThreats();
+}
 
-    // Fetch threats from backend
-    async function fetchThreats() {
-        const res = await fetch("/api/threats");
-        threats = await res.json();
-        populateFilters();
+function renderFilters() {
+    const sourceSet = new Set();
+    const typeSet = new Set();
+
+    threats.forEach(t => {
+        sourceSet.add(t.source || "Unknown");
+        typeSet.add(t.type || "Unknown");
+    });
+
+    const sourceFilter = document.getElementById("sourceFilter");
+    const typeFilter = document.getElementById("typeFilter");
+
+    sourceFilter.innerHTML = '<option value="All">All</option>';
+    typeFilter.innerHTML = '<option value="All">All</option>';
+
+    Array.from(sourceSet).sort().forEach(s => {
+        const opt = document.createElement("option");
+        opt.value = s;
+        opt.textContent = s;
+        sourceFilter.appendChild(opt);
+    });
+
+    Array.from(typeSet).sort().forEach(t => {
+        const opt = document.createElement("option");
+        opt.value = t;
+        opt.textContent = t;
+        typeFilter.appendChild(opt);
+    });
+}
+
+function renderThreats() {
+    const container = document.getElementById("threatContainer");
+    container.innerHTML = "";
+
+    const searchText = document.getElementById("searchBar").value.toLowerCase();
+    const sourceVal = document.getElementById("sourceFilter").value;
+    const typeVal = document.getElementById("typeFilter").value;
+    const readVal = document.getElementById("readFilter").value;
+
+    threats.forEach(t => {
+        // Filters
+        if (sourceVal !== "All" && t.source !== sourceVal) return;
+        if (typeVal !== "All" && t.type !== typeVal) return;
+        if (readVal === "Unread" && t.read_flag) return;
+        if (readVal === "Read" && !t.read_flag) return;
+        if (searchText && !(t.title.toLowerCase().includes(searchText) || t.description.toLowerCase().includes(searchText))) return;
+
+        const card = document.createElement("div");
+        card.className = "col";
+        card.innerHTML = `
+            <div class="card p-3 ${t.read_flag ? 'read' : 'unread'}">
+                <h5>${t.title}</h5>
+                <p>${t.description.length > 150 ? t.description.substring(0, 150) + "..." : t.description}</p>
+                <div>
+                    <span class="badge bg-info">${t.type || 'Unknown'}</span>
+                    <span class="badge bg-secondary">${t.source || 'Unknown'}</span>
+                    <small class="text-muted">${t.published_date || ''}</small>
+                </div>
+            </div>
+        `;
+        // Card click opens modal
+        card.querySelector(".card").addEventListener("click", () => openModal(t));
+        container.appendChild(card);
+    });
+}
+
+function openModal(threat) {
+    document.getElementById("modalTitle").textContent = threat.title;
+    document.getElementById("modalBody").textContent = threat.description;
+    document.getElementById("modalLink").href = threat.link || "#";
+
+    if (!threat.read_flag) {
+        markRead(threat.id);
+        threat.read_flag = 1;
         renderThreats();
     }
 
-    // Render threat cards
-    function renderThreats() {
-        const searchTerm = searchInput.value.toLowerCase();
-        const sourceVal = sourceFilter.value;
-        const typeVal = typeFilter.value;
-        const readVal = readFilter.value;
+    modal.show();
+}
 
-        cveContainer.innerHTML = "";
+async function markRead(id) {
+    await fetch(`/api/mark_read/${id}`, { method: "POST" });
+}
 
-        threats
-            .filter(t => {
-                if (sourceVal !== "All" && t.source !== sourceVal) return false;
-                if (typeVal !== "All" && t.type !== typeVal) return false;
-                if (readVal === "Read" && t.read_flag === 0) return false;
-                if (readVal === "Unread" && t.read_flag === 1) return false;
-                if (!t.title.toLowerCase().includes(searchTerm) && !t.description.toLowerCase().includes(searchTerm)) return false;
-                return true;
-            })
-            .forEach(t => {
-                const card = document.createElement("div");
-                card.className = `card ${t.read_flag ? "read" : "unread"}`;
-                card.innerHTML = `
-                    <div>
-                        <span class="badge type-${t.type.replace(/\s+/g,'')}">${t.type}</span>
-                        <span class="badge source-badge">${t.source}</span>
-                    </div>
-                    <h5>${t.title}</h5>
-                    <p>${t.description.length > 200 ? t.description.substring(0,200) + " [...]" : t.description}</p>
-                    <small>${t.published_date}</small>
-                `;
+// Live search
+document.getElementById("searchBar").addEventListener("input", renderThreats);
 
-                // Click opens modal with full description
-                card.addEventListener("click", () => openModal(t));
+// Filters
+document.getElementById("sourceFilter").addEventListener("change", renderThreats);
+document.getElementById("typeFilter").addEventListener("change", renderThreats);
+document.getElementById("readFilter").addEventListener("change", renderThreats);
 
-                cveContainer.appendChild(card);
-            });
-    }
-
-    // Populate filters dynamically
-    function populateFilters() {
-        const sources = ["All", ...new Set(threats.map(t => t.source || "Unknown"))];
-        const types = ["All", ...new Set(threats.map(t => t.type || "Unknown"))];
-
-        sourceFilter.innerHTML = sources.map(s => `<option value="${s}">${s}</option>`).join("");
-        typeFilter.innerHTML = types.map(t => `<option value="${t}">${t}</option>`).join("");
-    }
-
-    // Modal handling
-    const modal = document.getElementById("threatModal");
-    const modalTitle = document.getElementById("modalTitle");
-    const modalBody = document.getElementById("modalBody");
-    const modalLink = document.getElementById("modalLink");
-    const closeModal = document.getElementById("closeModal");
-
-    function openModal(t) {
-        modalTitle.innerText = t.title;
-        modalBody.innerText = t.description;
-        modalLink.href = t.link || "#";
-        modalLink.target = "_blank";
-        modal.style.display = "block";
-
-        // Mark read instantly
-        if (t.read_flag === 0) {
-            fetch(`/api/mark_read/${t.id}`, { method: "POST" })
-                .then(() => { t.read_flag = 1; renderThreats(); });
-        }
-    }
-
-    closeModal.addEventListener("click", () => { modal.style.display = "none"; });
-    window.addEventListener("click", e => { if (e.target === modal) modal.style.display = "none"; });
-
-    // Event listeners
-    [searchInput, sourceFilter, typeFilter, readFilter].forEach(el => {
-        el.addEventListener("input", renderThreats);
-        el.addEventListener("change", renderThreats);
-    });
-
-    // Dark mode toggle
-    darkToggle.addEventListener("change", () => {
-        document.body.classList.toggle("dark-mode", darkToggle.checked);
-    });
-
-    // Cache interval selection
-    cacheIntervalSelect.addEventListener("change", () => {
-        const minutes = parseInt(cacheIntervalSelect.value);
-        fetch("/api/set_cache_interval", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ minutes })
-        });
-    });
-
-    // Add custom feed
-    addFeedForm.addEventListener("submit", e => {
-        e.preventDefault();
-        const url = document.getElementById("feed-url").value;
-        const source = document.getElementById("feed-source").value || "Custom";
-        const type = document.getElementById("feed-type").value || "Unknown";
-
-        fetch("/api/add_feed", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ url, source, type })
-        }).then(res => res.json()).then(data => {
-            if (data.status === "ok") {
-                fetchThreats();
-                addFeedForm.reset();
-            } else {
-                alert("Error adding feed: " + data.message);
-            }
-        });
-    });
-
-    fetchThreats();
+// Dark mode toggle
+document.getElementById("darkModeToggle").addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
 });
+
+fetchThreats();
