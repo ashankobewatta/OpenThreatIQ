@@ -1,26 +1,71 @@
+/* Body & dark mode */
 body {
     background-color: #fdf6f0;
     color: #222;
     font-family: Arial, sans-serif;
-    transition: background-color 0.3s, color 0.3s;
+    transition: background 0.3s, color 0.3s;
 }
 .dark-mode {
     background-color: #1c1c1c;
     color: #eee;
 }
+
+/* Cards */
 .card {
-    cursor: pointer;
+    cursor: default;
     transition: transform 0.2s, box-shadow 0.2s;
-    min-height: 150px;
+    margin-bottom: 15px;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
 }
 .card:hover {
     transform: scale(1.02);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
-.unread { border-left: 4px solid #ff6b6b; }
-.read { opacity: 0.7; }
-.badge { margin-right: 5px; }
-#threat-container { margin-top: 20px; }
-.row.mb-3 label { font-weight: bold; }
-#searchInput { width: 100%; }
-.modal-body { white-space: pre-wrap; }
+
+/* Read/unread indicator */
+.unread {
+    border-left: 5px solid #ff9f80;
+}
+.read {
+    opacity: 0.75;
+}
+
+/* Badges */
+.badge {
+    margin-right: 5px;
+    font-size: 0.8rem;
+    padding: 0.3em 0.6em;
+}
+
+/* Buttons inside cards */
+.card .btn {
+    margin-right: 5px;
+    margin-top: 5px;
+}
+
+/* Filters */
+.form-label {
+    font-weight: 600;
+}
+
+/* Modal adjustments */
+.modal-body {
+    word-wrap: break-word;
+    white-space: pre-wrap;
+}
+
+/* Search input */
+#searchInput {
+    width: 100%;
+}
+
+/* Responsive cards on laptop screens */
+@media (min-width: 992px) {
+    .card {
+        max-width: 95%;
+        margin-left: auto;
+        margin-right: auto;
+    }
+}
