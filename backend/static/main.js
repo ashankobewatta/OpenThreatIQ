@@ -8,14 +8,8 @@ const darkModeToggle = document.getElementById("dark-mode-toggle");
 
 let threats = [];
 
-// Load dark mode preference
-if(localStorage.getItem("dark-mode") === "true") {
-    document.body.classList.add("dark-mode");
-}
-
 // Fetch threats from backend
 async function fetchThreats() {
-    threatContainer.innerHTML = `<div class="text-center my-3">Loading threats...</div>`;
     try {
         const res = await fetch("/api/threats");
         threats = await res.json();
@@ -23,7 +17,6 @@ async function fetchThreats() {
         renderThreats();
     } catch (err) {
         console.error("Error fetching threats:", err);
-        threatContainer.innerHTML = `<div class="text-danger my-3">Failed to load threats</div>`;
     }
 }
 
@@ -80,9 +73,21 @@ function renderThreats() {
 // Show modal with full threat details
 function showModal(threat) {
     document.getElementById("modal-title").textContent = threat.title;
-    document.getElementById("modal-body").textContent = threat.description;
-    document.getElementById("modal-link").href = threat.link || "#";
 
+    // Preserve line breaks and full content
+    document.getElementById("modal-body").innerHTML = threat.description
+        .replace(/\n/g, "<br>");
+
+    // Link to original source
+    const linkEl = document.getElementById("modal-link");
+    if (threat.link) {
+        linkEl.href = threat.link;
+        linkEl.style.display = "inline-block";
+    } else {
+        linkEl.style.display = "none";
+    }
+
+    // Mark as read if not already
     if (!threat.read_flag) {
         fetch(`/api/mark_read/${threat.id}`, { method: "POST" })
             .then(() => {
@@ -111,17 +116,7 @@ searchInput.addEventListener("input", renderThreats);
 sourceFilter.addEventListener("change", renderThreats);
 typeFilter.addEventListener("change", renderThreats);
 readFilter.addEventListener("change", renderThreats);
-darkModeToggle.addEventListener("click", () => {
-    document.body.classList.toggle("dark-mode");
-    localStorage.setItem("dark-mode", document.body.classList.contains("dark-mode"));
-});
-
-// Auto-refresh threats
-setInterval(fetchThreats, parseInt(cacheIntervalSelect.value, 10) * 60000);
-cacheIntervalSelect.addEventListener("change", () => {
-    clearInterval();
-    setInterval(fetchThreats, parseInt(cacheIntervalSelect.value, 10) * 60000);
-});
+darkModeToggle.addEventListener("click", () => document.body.classList.toggle("dark-mode"));
 
 // Initial load
 fetchThreats();
