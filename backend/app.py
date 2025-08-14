@@ -1,30 +1,7 @@
-from flask import Flask, jsonify, render_template
-from utils import fetch_all_feeds, CACHE_FILE
-import threading
-import time
-from datetime import datetime
+from flask import Flask, jsonify, render_template, request
+from utils import fetch_all_feeds, add_custom_feed, get_all_cves
 
 app = Flask(__name__)
-
-# Cache update interval: 10 minutes
-CACHE_UPDATE_INTERVAL = 10 * 60  # 10 minutes in seconds
-
-def background_cache_updater():
-    while True:
-        try:
-            print(f"[{datetime.now().isoformat()}] Running background cache update...")
-            new_data = fetch_all_feeds()
-            # Replace old cache with new data
-            with open(CACHE_FILE, "w", encoding="utf-8") as f:
-                import json
-                json.dump(new_data, f, indent=2)
-            print(f"[{datetime.now().isoformat()}] Cache updated successfully.")
-        except Exception as e:
-            print(f"[{datetime.now().isoformat()}] Error updating cache: {e}")
-        time.sleep(CACHE_UPDATE_INTERVAL)
-
-# Start background updater as daemon
-threading.Thread(target=background_cache_updater, daemon=True).start()
 
 @app.route("/")
 def index():
@@ -32,23 +9,20 @@ def index():
 
 @app.route("/api/cves")
 def api_cves():
-    import json
-    try:
-        with open(CACHE_FILE, "r", encoding="utf-8") as f:
-            cves = json.load(f)
-    except Exception as e:
-        print(f"[{datetime.now().isoformat()}] Error loading cache: {e}")
-        cves = []
+    cves = get_all_cves()
     return jsonify(cves)
 
+@app.route("/api/add_feed", methods=["POST"])
+def api_add_feed():
+    data = request.json
+    name = data.get("name")
+    url = data.get("url")
+    ftype = data.get("type", "Update")
+    if name and url:
+        add_custom_feed(name, url, ftype)
+        return jsonify({"status": "success"}), 201
+    return jsonify({"status": "error", "message": "Missing name or url"}), 400
+
 if __name__ == "__main__":
-    print(f"[{datetime.now().isoformat()}] Starting OpenThreatIQ server...")
-    # Fetch once at startup to populate cache immediately
-    try:
-        initial_data = fetch_all_feeds()
-        with open(CACHE_FILE, "w", encoding="utf-8") as f:
-            import json
-            json.dump(initial_data, f, indent=2)
-    except Exception as e:
-        print(f"[{datetime.now().isoformat()}] Initial cache fetch failed: {e}")
+    fetch_all_feeds()  # update cache on startup
     app.run(debug=True)
