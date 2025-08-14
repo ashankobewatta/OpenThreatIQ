@@ -1,5 +1,5 @@
 from flask import Flask, jsonify, render_template, request
-from utils import fetch_all_feeds, get_all_cves, mark_cve_read, set_cache_interval
+from utils import fetch_all_feeds, get_all_cves, mark_cve_read, set_cache_interval, start_background_refresh
 
 app = Flask(__name__)
 
@@ -29,5 +29,6 @@ def api_set_cache_interval():
         return jsonify({"status": "error", "message": "Invalid value"}), 400
 
 if __name__ == "__main__":
-    fetch_all_feeds()  # refresh cache on startup
+    fetch_all_feeds()           # Initial fetch
+    start_background_refresh()  # Start auto-refresh in background
     app.run(host="0.0.0.0", port=5000, debug=True)
