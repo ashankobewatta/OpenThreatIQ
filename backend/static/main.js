@@ -73,21 +73,9 @@ function renderThreats() {
 // Show modal with full threat details
 function showModal(threat) {
     document.getElementById("modal-title").textContent = threat.title;
-
-    // Preserve line breaks and full content
     document.getElementById("modal-body").innerHTML = formatDescription(threat.description);
-        .replace(/\n/g, "<br>");
+    document.getElementById("modal-link").href = threat.link || "#";
 
-    // Link to original source
-    const linkEl = document.getElementById("modal-link");
-    if (threat.link) {
-        linkEl.href = threat.link;
-        linkEl.style.display = "inline-block";
-    } else {
-        linkEl.style.display = "none";
-    }
-
-    // Mark as read if not already
     if (!threat.read_flag) {
         fetch(`/api/mark_read/${threat.id}`, { method: "POST" })
             .then(() => {
@@ -99,17 +87,25 @@ function showModal(threat) {
     new bootstrap.Modal(document.getElementById("threatModal")).show();
 }
 
+// Format description into paragraphs and clean up
 function formatDescription(desc) {
     // Remove excessive line breaks
     desc = desc.replace(/\n{2,}/g, "\n");
 
+    // Optional: strip unrelated sections
+    const unwantedSections = ["Related Articles", "Get the Blue Report", "Picus Blue Report"];
+    unwantedSections.forEach(keyword => {
+        if (desc.includes(keyword)) {
+            desc = desc.split(keyword)[0].trim();
+        }
+    });
+
     // Split into paragraphs
     const paragraphs = desc.split("\n").map(p => p.trim()).filter(p => p.length > 0);
-    
-    // Wrap in <p>
+
+    // Wrap in <p> tags
     return paragraphs.map(p => `<p>${p}</p>`).join("");
 }
-
 
 // Set cache interval
 cacheIntervalSelect.addEventListener("change", () => {
