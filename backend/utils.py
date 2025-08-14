@@ -6,15 +6,18 @@ import gzip
 import io
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
+import logging
 
 DB_FILE = "data/threats.db"
-CACHE_EXPIRY_MINUTES = 30  # Default
+CACHE_EXPIRY_MINUTES = 30  # default
 
 FEEDS = [
     {"url": "https://www.bleepingcomputer.com/feed/", "source": "BleepingComputer", "type": "Malware", "format": "rss"},
     {"url": "https://feeds.feedburner.com/GoogleChromeReleases", "source": "Google Chrome", "type": "Patch", "format": "rss"},
     {"url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "source": "NVD", "type": "CVE", "format": "json"}
 ]
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 def init_db():
     conn = sqlite3.connect(DB_FILE)
@@ -40,18 +43,20 @@ def fetch_all_feeds():
     init_db()
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-
+    
+    # check last update
     c.execute("SELECT value FROM config WHERE key='last_update'")
     row = c.fetchone()
     now = datetime.utcnow()
+    interval = get_cache_interval()
     if row:
         last_update = datetime.fromisoformat(row[0])
-        if now - last_update < timedelta(minutes=get_cache_interval()):
-            print(f"[{datetime.now().isoformat()}] Using cached threats from DB")
+        if now - last_update < timedelta(minutes=interval):
+            logging.info("Using cached threats from DB")
             conn.close()
             return get_all_threats()
-
-    print(f"[{datetime.now().isoformat()}] Updating feeds...")
+    
+    logging.info("Updating feeds...")
     for feed in FEEDS:
         try:
             if feed["format"] == "rss":
@@ -63,7 +68,7 @@ def fetch_all_feeds():
                 for item in items:
                     upsert_threat(c, item["id"], item["id"], item["description"], "", feed["source"], feed["type"], item["publishedDate"])
         except Exception as e:
-            print(f"Error fetching {feed['source']}: {e}")
+            logging.error(f"Error fetching {feed['source']}: {e}")
 
     c.execute("REPLACE INTO config(key, value) VALUES (?, ?)", ("last_update", now.isoformat()))
     conn.commit()
@@ -80,34 +85,17 @@ def fetch_rss_feed(url):
     resp.raise_for_status()
     feed = feedparser.parse(resp.content)
     items = []
-
     for entry in feed.entries:
-        # Prefer full content if available
         content = entry.get("content", [{}])[0].get("value") or entry.get("summary", "")
         content = BeautifulSoup(content, "html.parser").get_text()
-
-        # For trusted sources, attempt to fetch full article from the page
-        if "bleepingcomputer.com" in entry.link:
-            try:
-                page_resp = requests.get(entry.link, headers=headers, timeout=10)
-                page_resp.raise_for_status()
-                soup = BeautifulSoup(page_resp.text, "html.parser")
-                full_article = soup.find("div", class_="article-content")
-                if full_article:
-                    content = full_article.get_text(separator="\n").strip()
-            except Exception as e:
-                print(f"Failed to fetch full article from {entry.link}: {e}")
-                # fallback to RSS summary
-
         items.append({
             "id": entry.get("id") or entry.get("link"),
             "title": entry.get("title"),
-            "description": content,  # store full content
+            "description": content,
             "link": entry.get("link"),
             "published_date": entry.get("published") or entry.get("updated") or ""
         })
     return items
-
 
 def fetch_nvd_json(url):
     headers = {"User-Agent": "OpenThreatIQ/1.0"}
