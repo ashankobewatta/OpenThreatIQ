@@ -6,7 +6,7 @@ import logging
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-app = Flask(__name__, template_folder="../frontend", static_folder="../frontend")
+app = Flask(__name__, template_folder="templates", static_folder="../frontend")
 
 # Ensure data folder exists
 os.makedirs("data", exist_ok=True)
