@@ -21,14 +21,14 @@ OpenThreatIQ is an open-source Threat Intelligence Dashboard that aggregates cyb
 OpenThreatIQ/
 ├── backend/
 │   ├── app.py
-│   ├── requirements.txt
-│   └── utils.py
+│   ├── utils.py
+│   └── requirements.txt
 ├── frontend/
 │   ├── index.html
 │   ├── main.js
 │   └── styles.css
 ├── data/
-│   └── cve_cache.json
+│   └── threats.db           # Will be created automatically on first run
 ├── docker-compose.yml
 ├── README.md
 └── LICENSE
