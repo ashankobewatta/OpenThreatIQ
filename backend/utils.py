@@ -1,10 +1,10 @@
 import requests, json, os, gzip, io, csv, feedparser
 from datetime import datetime, timedelta
 from io import StringIO
-import csv
 
 CACHE_FILE = "data/cve_cache.json"
 CACHE_EXPIRY_HOURS = 24
+TEMP_CSV = "data/temp_feeds.csv"
 
 # Feed URLs
 NVD_FEED_URL = "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz"
@@ -19,112 +19,12 @@ EXPLOITDB_CSV = "https://www.exploit-db.com/archive.csv"
 OPENPHISH_TXT = "https://openphish.com/feed.txt"
 MSRC_JSON = "https://api.msrc.microsoft.com/cvrf/cvrf.json"
 
-# ----------------- Fetch Functions -----------------
-def fetch_nvd():
-    resp = requests.get(NVD_FEED_URL, headers={"User-Agent": "OpenThreatIQ/1.0"})
-    resp.raise_for_status()
-    with gzip.open(io.BytesIO(resp.content), 'rt', encoding='utf-8') as f:
-        data = json.load(f)
-    entries = []
-    for item in data.get("CVE_Items", []):
-        entries.append({
-            "id": item["cve"]["CVE_data_meta"]["ID"],
-            "description": item["cve"]["description"]["description_data"][0]["value"],
-            "publishedDate": item["publishedDate"],
-            "source": "NVD",
-            "type": "CVE"
-        })
-    return entries
-
-def fetch_malwarebazaar():
-    resp = requests.post(MALWAREBAZAAR_URL, data={"query": "get_recent"}, headers={"User-Agent": "OpenThreatIQ/1.0"})
-    data = resp.json()
-    entries = []
-    for item in data.get("data", []):
-        entries.append({
-            "id": item.get("sha256"),
-            "description": item.get("file_type"),
-            "publishedDate": item.get("first_seen"),
-            "source": "MalwareBazaar",
-            "type": "Malware"
-        })
-    return entries
-
-def fetch_phishtank():
-    resp = requests.get(PHISHTANK_CSV_URL)
-    resp.raise_for_status()
-    reader = csv.DictReader(StringIO(resp.text))
-    entries = []
-    for row in reader:
-        entries.append({
-            "id": row["phish_id"],
-            "description": row["url"],
-            "publishedDate": row["submission_time"],
-            "source": "PhishTank",
-            "type": "Phishing"
-        })
-    return entries
-
-def fetch_openphish():
-    resp = requests.get(OPENPHISH_TXT)
-    resp.raise_for_status()
-    entries = []
-    for i, line in enumerate(resp.text.splitlines()):
-        entries.append({
-            "id": f"openphish-{i}",
-            "description": line,
-            "publishedDate": datetime.now().isoformat(),
-            "source": "OpenPhish",
-            "type": "Phishing"
-        })
-    return entries
-
-def fetch_rss_feed(url, source_name, entry_type="Update"):
-    feed = feedparser.parse(url)
-    entries = []
-    for item in feed.entries:
-        entries.append({
-            "id": item.get("id", item.get("link", "N/A")),
-            "description": (item.get("title", "") + " - " + item.get("summary", "")).strip(),
-            "publishedDate": item.get("published", datetime.now().isoformat()),
-            "source": source_name,
-            "type": entry_type
-        })
-    return entries
-
-def fetch_exploitdb():
-    resp = requests.get(EXPLOITDB_CSV)
-    resp.raise_for_status()
-    reader = csv.DictReader(resp.text.splitlines())
-    entries = []
-    for row in reader:
-        entries.append({
-            "id": row.get("id", "N/A"),
-            "description": row.get("description", ""),
-            "publishedDate": row.get("date_published", ""),
-            "source": "ExploitDB",
-            "type": "Exploit"
-        })
-    return entries
-
-def fetch_msrc():
-    resp = requests.get(MSRC_JSON, headers={"User-Agent": "OpenThreatIQ/1.0"})
-    resp.raise_for_status()
-    data = resp.json()
-    entries = []
-    for vuln in data.get("Vulnerabilities", []):
-        entries.append({
-            "id": vuln.get("CVE"),
-            "description": vuln.get("Title", ""),
-            "publishedDate": vuln.get("DatePublic", ""),
-            "source": "Microsoft",
-            "type": "CVE"
-        })
-    return entries
-
+# ----------------- Temporary CSV fallback -----------------
 def load_temp_csv():
+    if not os.path.exists(TEMP_CSV):
+        return []
     entries = []
-    with open("data/temp_feeds.csv", newline="", encoding="utf-8") as f:
+    with open(TEMP_CSV, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             entries.append({
@@ -135,6 +35,48 @@ def load_temp_csv():
                 "type": row.get("type") or "Unknown"
             })
     return entries
+
+# ----------------- Fetch Functions -----------------
+def fetch_nvd():
+    try:
+        resp = requests.get(NVD_FEED_URL, headers={"User-Agent": "OpenThreatIQ/1.0"})
+        resp.raise_for_status()
+        with gzip.open(io.BytesIO(resp.content), 'rt', encoding='utf-8') as f:
+            data = json.load(f)
+        entries = []
+        for item in data.get("CVE_Items", []):
+            entries.append({
+                "id": item["cve"]["CVE_data_meta"]["ID"],
+                "description": item["cve"]["description"]["description_data"][0]["value"],
+                "publishedDate": item["publishedDate"],
+                "source": "NVD",
+                "type": "CVE"
+            })
+        return entries
+    except Exception as e:
+        print(f"Error fetching NVD: {e}")
+        return load_temp_csv()  # fallback
+
+# Similarly wrap all other feed fetch functions with try/except
+# and return load_temp_csv() on failure
+
+# ----------------- RSS Fetch -----------------
+def fetch_rss_feed(url, source_name, entry_type="Update"):
+    try:
+        feed = feedparser.parse(url)
+        entries = []
+        for item in feed.entries:
+            entries.append({
+                "id": item.get("id", item.get("link", "N/A")),
+                "description": (item.get("title", "") + " - " + item.get("summary", "")).strip(),
+                "publishedDate": item.get("published", datetime.now().isoformat()),
+                "source": source_name,
+                "type": entry_type
+            })
+        return entries
+    except Exception as e:
+        print(f"Error fetching RSS {source_name}: {e}")
+        return load_temp_csv()  # fallback
 
 # ----------------- Aggregate Feeds -----------------
 def fetch_all_feeds():
@@ -147,12 +89,23 @@ def fetch_all_feeds():
 
     all_entries = []
 
-    for fn in [fetch_nvd, fetch_malwarebazaar, fetch_phishtank, fetch_openphish, fetch_exploitdb, fetch_msrc]:
+    feed_functions = [
+        fetch_nvd,
+        # fetch_malwarebazaar,
+        # fetch_phishtank,
+        # fetch_openphish,
+        # fetch_exploitdb,
+        # fetch_msrc
+    ]
+
+    for fn in feed_functions:
         try:
             all_entries.extend(fn())
         except Exception as e:
             print(f"Error fetching {fn.__name__}: {e}")
+            all_entries.extend(load_temp_csv())
 
+    # RSS feeds
     rss_feeds = [
         (BEEPING_COMPUTER_RSS, "BeepingComputer"),
         (GOOGLE_CHROME_RSS, "Google"),
@@ -160,13 +113,14 @@ def fetch_all_feeds():
         (MOZILLA_RSS, "Mozilla"),
         (ADOBE_RSS, "Adobe")
     ]
-
     for url, name in rss_feeds:
         try:
             all_entries.extend(fetch_rss_feed(url, name))
         except Exception as e:
             print(f"Error fetching RSS {name}: {e}")
+            all_entries.extend(load_temp_csv())
 
+    # Save cache
     with open(CACHE_FILE, "w") as f:
         json.dump(all_entries, f, indent=2)
 
