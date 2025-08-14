@@ -8,8 +8,14 @@ const darkModeToggle = document.getElementById("dark-mode-toggle");
 
 let threats = [];
 
+// Load dark mode preference
+if(localStorage.getItem("dark-mode") === "true") {
+    document.body.classList.add("dark-mode");
+}
+
 // Fetch threats from backend
 async function fetchThreats() {
+    threatContainer.innerHTML = `<div class="text-center my-3">Loading threats...</div>`;
     try {
         const res = await fetch("/api/threats");
         threats = await res.json();
@@ -17,6 +23,7 @@ async function fetchThreats() {
         renderThreats();
     } catch (err) {
         console.error("Error fetching threats:", err);
+        threatContainer.innerHTML = `<div class="text-danger my-3">Failed to load threats</div>`;
     }
 }
 
@@ -104,7 +111,17 @@ searchInput.addEventListener("input", renderThreats);
 sourceFilter.addEventListener("change", renderThreats);
 typeFilter.addEventListener("change", renderThreats);
 readFilter.addEventListener("change", renderThreats);
-darkModeToggle.addEventListener("click", () => document.body.classList.toggle("dark-mode"));
+darkModeToggle.addEventListener("click", () => {
+    document.body.classList.toggle("dark-mode");
+    localStorage.setItem("dark-mode", document.body.classList.contains("dark-mode"));
+});
+
+// Auto-refresh threats
+setInterval(fetchThreats, parseInt(cacheIntervalSelect.value, 10) * 60000);
+cacheIntervalSelect.addEventListener("change", () => {
+    clearInterval();
+    setInterval(fetchThreats, parseInt(cacheIntervalSelect.value, 10) * 60000);
+});
 
 // Initial load
 fetchThreats();
