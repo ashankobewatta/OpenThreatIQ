@@ -7,9 +7,8 @@ const cacheIntervalSelect = document.getElementById("cache-interval");
 const darkModeToggle = document.getElementById("dark-mode-toggle");
 
 let threats = [];
-let autoRefreshTimer;
 
-// Fetch threats
+// Fetch threats from backend
 async function fetchThreats() {
     try {
         const res = await fetch("/api/threats");
@@ -21,7 +20,7 @@ async function fetchThreats() {
     }
 }
 
-// Populate filters
+// Populate filter dropdowns
 function populateFilters() {
     const sources = new Set(threats.map(t => t.source || "Unknown"));
     const types = new Set(threats.map(t => t.type || "Unknown"));
@@ -71,14 +70,15 @@ function renderThreats() {
         });
 }
 
-// Show modal
+// Show modal with full threat details
 function showModal(threat) {
     document.getElementById("modal-title").textContent = threat.title;
     document.getElementById("modal-body").textContent = threat.description;
     document.getElementById("modal-link").href = threat.link || "#";
 
     if (!threat.read_flag) {
-        fetch(`/api/mark_read/${threat.id}`, { method: "POST" })
+        // Encode threat ID to handle slashes and special characters
+        fetch(`/api/mark_read/${encodeURIComponent(threat.id)}`, { method: "POST" })
             .then(() => {
                 threat.read_flag = 1;
                 renderThreats();
@@ -88,7 +88,7 @@ function showModal(threat) {
     new bootstrap.Modal(document.getElementById("threatModal")).show();
 }
 
-// Cache interval change
+// Set cache interval
 cacheIntervalSelect.addEventListener("change", () => {
     const minutes = parseInt(cacheIntervalSelect.value, 10);
     fetch("/api/set_cache_interval", {
@@ -97,25 +97,16 @@ cacheIntervalSelect.addEventListener("change", () => {
         body: JSON.stringify({ minutes })
     }).then(res => {
         if (!res.ok) console.error("Failed to set cache interval");
-        else {
-            fetchThreats(); // immediate refresh
-            clearInterval(autoRefreshTimer);
-            autoRefreshTimer = setInterval(fetchThreats, minutes * 60000);
-        }
+        else fetchThreats(); // Refresh threats immediately after changing interval
     });
 });
-
-// Dark mode toggle
-darkModeToggle.addEventListener("click", () => document.body.classList.toggle("dark-mode"));
 
 // Event listeners
 searchInput.addEventListener("input", renderThreats);
 sourceFilter.addEventListener("change", renderThreats);
 typeFilter.addEventListener("change", renderThreats);
 readFilter.addEventListener("change", renderThreats);
+darkModeToggle.addEventListener("click", () => document.body.classList.toggle("dark-mode"));
 
 // Initial load
-fetchThreats().then(() => {
-    const minutes = parseInt(cacheIntervalSelect.value, 10);
-    autoRefreshTimer = setInterval(fetchThreats, minutes * 60000);
-});
+fetchThreats();
