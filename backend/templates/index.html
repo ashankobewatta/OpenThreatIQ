@@ -7,52 +7,73 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-light bg-light px-3">
-    <a class="navbar-brand" href="#">OpenThreatIQ</a>
-    <div class="ms-auto">
-        <button id="darkModeToggle" class="btn btn-sm btn-outline-secondary">Toggle Dark Mode</button>
+<div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h1>OpenThreatIQ</h1>
+        <button id="darkModeToggle" class="btn btn-outline-secondary">Toggle Dark Mode</button>
     </div>
-</nav>
 
-<div class="container mt-3">
-
-    <!-- Filters -->
-    <div class="row mb-3 g-2">
-        <div class="col-md-3">
-            <label for="filterSource" class="form-label fw-bold">Source</label>
-            <select id="filterSource" class="form-select"><option value="">All</option></select>
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Search Threats</label>
+            <input id="searchInput" type="text" class="form-control" placeholder="Search...">
         </div>
         <div class="col-md-3">
-            <label for="filterType" class="form-label fw-bold">Type</label>
-            <select id="filterType" class="form-select"><option value="">All</option></select>
+            <label class="form-label">Source Filter</label>
+            <select id="sourceFilter" class="form-select"><option value="">All Sources</option></select>
         </div>
         <div class="col-md-3">
-            <label for="filterRead" class="form-label fw-bold">Read Status</label>
-            <select id="filterRead" class="form-select">
+            <label class="form-label">Type Filter</label>
+            <select id="typeFilter" class="form-select"><option value="">All Types</option></select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Read Filter</label>
+            <select id="readFilter" class="form-select">
                 <option value="">All</option>
-                <option value="read">Read</option>
-                <option value="unread">Unread</option>
+                <option value="0">Unread</option>
+                <option value="1">Read</option>
             </select>
         </div>
-        <div class="col-md-3">
-            <label for="searchInput" class="form-label fw-bold">Search</label>
-            <input type="text" id="searchInput" class="form-control" placeholder="Search threats...">
+    </div>
+
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <label class="form-label">Add Custom Feed</label>
+            <div class="input-group">
+                <input id="newFeedName" type="text" class="form-control" placeholder="Name">
+                <input id="newFeedURL" type="text" class="form-control" placeholder="URL">
+                <button id="addFeedBtn" class="btn btn-primary">Add</button>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label">Cache Refresh Interval (minutes)</label>
+            <select id="cacheInterval" class="form-select">
+                <option value="5">5</option>
+                <option value="10">10</option>
+                <option value="15">15</option>
+                <option value="30" selected>30</option>
+                <option value="60">60</option>
+            </select>
         </div>
     </div>
 
-    <!-- Threat cards -->
-    <div id="threat-container" class="row g-3"></div>
+    <div id="cve-container" class="row"></div>
 </div>
 
-<!-- Modal -->
-<div class="modal fade" id="threatModal" tabindex="-1" aria-labelledby="threatModalLabel" aria-hidden="true">
+<!-- Modal for full details -->
+<div class="modal fade" id="threatModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="threatModalLabel">Threat Details</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        <h5 class="modal-title" id="modalTitle"></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
-      <div class="modal-body" id="modalContent"></div>
+      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-footer">
+        <a id="modalLink" class="btn btn-primary" target="_blank">Go to Source</a>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
     </div>
   </div>
 </div>
