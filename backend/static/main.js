@@ -7,8 +7,9 @@ const cacheIntervalSelect = document.getElementById("cache-interval");
 const darkModeToggle = document.getElementById("dark-mode-toggle");
 
 let threats = [];
+let autoRefreshTimer;
 
-// Fetch threats from backend
+// Fetch threats
 async function fetchThreats() {
     try {
         const res = await fetch("/api/threats");
@@ -20,7 +21,7 @@ async function fetchThreats() {
     }
 }
 
-// Populate filter dropdowns
+// Populate filters
 function populateFilters() {
     const sources = new Set(threats.map(t => t.source || "Unknown"));
     const types = new Set(threats.map(t => t.type || "Unknown"));
@@ -70,10 +71,10 @@ function renderThreats() {
         });
 }
 
-// Show modal with full threat details
+// Show modal
 function showModal(threat) {
     document.getElementById("modal-title").textContent = threat.title;
-    document.getElementById("modal-body").innerHTML = formatDescription(threat.description);
+    document.getElementById("modal-body").textContent = threat.description;
     document.getElementById("modal-link").href = threat.link || "#";
 
     if (!threat.read_flag) {
@@ -87,27 +88,7 @@ function showModal(threat) {
     new bootstrap.Modal(document.getElementById("threatModal")).show();
 }
 
-// Format description into paragraphs and clean up
-function formatDescription(desc) {
-    // Remove excessive line breaks
-    desc = desc.replace(/\n{2,}/g, "\n");
-
-    // Optional: strip unrelated sections
-    const unwantedSections = ["Related Articles", "Get the Blue Report", "Picus Blue Report"];
-    unwantedSections.forEach(keyword => {
-        if (desc.includes(keyword)) {
-            desc = desc.split(keyword)[0].trim();
-        }
-    });
-
-    // Split into paragraphs
-    const paragraphs = desc.split("\n").map(p => p.trim()).filter(p => p.length > 0);
-
-    // Wrap in <p> tags
-    return paragraphs.map(p => `<p>${p}</p>`).join("");
-}
-
-// Set cache interval
+// Cache interval change
 cacheIntervalSelect.addEventListener("change", () => {
     const minutes = parseInt(cacheIntervalSelect.value, 10);
     fetch("/api/set_cache_interval", {
@@ -116,15 +97,25 @@ cacheIntervalSelect.addEventListener("change", () => {
         body: JSON.stringify({ minutes })
     }).then(res => {
         if (!res.ok) console.error("Failed to set cache interval");
+        else {
+            fetchThreats(); // immediate refresh
+            clearInterval(autoRefreshTimer);
+            autoRefreshTimer = setInterval(fetchThreats, minutes * 60000);
+        }
     });
 });
+
+// Dark mode toggle
+darkModeToggle.addEventListener("click", () => document.body.classList.toggle("dark-mode"));
 
 // Event listeners
 searchInput.addEventListener("input", renderThreats);
 sourceFilter.addEventListener("change", renderThreats);
 typeFilter.addEventListener("change", renderThreats);
 readFilter.addEventListener("change", renderThreats);
-darkModeToggle.addEventListener("click", () => document.body.classList.toggle("dark-mode"));
 
 // Initial load
-fetchThreats();
+fetchThreats().then(() => {
+    const minutes = parseInt(cacheIntervalSelect.value, 10);
+    autoRefreshTimer = setInterval(fetchThreats, minutes * 60000);
+});
