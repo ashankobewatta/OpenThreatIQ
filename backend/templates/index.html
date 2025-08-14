@@ -6,17 +6,22 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-    <h1>OpenThreatIQ Dashboard</h1>
-
-    <div class="filters">
-        <input type="text" id="search-bar" placeholder="Search threats...">
-        <select id="source-filter"><option value="all">All Sources</option></select>
-        <select id="type-filter"><option value="all">All Types</option></select>
-        <button id="dark-mode-toggle">Toggle Dark Mode</button>
-    </div>
-
-    <div id="cve-container"></div>
-
+    <header>
+        <h1>OpenThreatIQ - Threat Intelligence Dashboard</h1>
+        <div class="controls">
+            <input type="text" id="search" placeholder="Search CVEs, Malware, Phishing..." />
+            <select id="filter-source">
+                <option value="">All Sources</option>
+            </select>
+            <select id="filter-type">
+                <option value="">All Types</option>
+            </select>
+            <button id="dark-mode-toggle">Dark Mode</button>
+        </div>
+    </header>
+    <main>
+        <div id="cve-container" class="grid"></div>
+    </main>
     <script src="{{ url_for('static', filename='main.js') }}"></script>
 </body>
 </html>
