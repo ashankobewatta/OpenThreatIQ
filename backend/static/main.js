@@ -7,6 +7,7 @@ async function loadCachedCVEs() {
         allCVEs = await response.json();
         populateFilters();
         renderCVEs(allCVEs);
+        updateLastUpdated();
     } catch (e) {
         console.error("Error fetching CVEs from backend", e);
         allCVEs = [];
@@ -28,7 +29,14 @@ function renderCVEs(cves) {
         if(readList.includes(cve.id)) div.classList.add("read");
 
         const type = cve.type || "Update";
-        const badge = `<span class="badge ${type}">${type}</span>`;
+        const badgeColors = {
+            "CVE": "bg-danger",
+            "Malware": "bg-warning",
+            "Phishing": "bg-info",
+            "Exploit": "bg-primary",
+            "Update": "bg-secondary"
+        };
+        const badge = `<span class="badge ${badgeColors[type]||'bg-secondary'}">${type}</span>`;
 
         div.innerHTML = `
             ${badge}
@@ -102,33 +110,35 @@ document.getElementById("dark-mode-toggle").addEventListener("click", ()=>{
     document.body.classList.toggle("dark");
 });
 
-// ------------------ Add Custom Feed ------------------
-document.getElementById("add-feed-btn").addEventListener("click", async ()=>{
-    const name = document.getElementById("custom-source").value.trim();
-    const url = document.getElementById("custom-url").value.trim();
-    const type = document.getElementById("custom-type").value;
-
-    if(!name || !url) return alert("Please provide source name and feed URL.");
+// ------------------ Update cache interval ------------------
+document.getElementById("update-cache-btn").addEventListener("click", async ()=>{
+    const interval = parseInt(document.getElementById("cache-interval").value);
+    if(isNaN(interval) || interval < 1) return alert("Invalid interval");
 
     try {
-        const resp = await fetch("/api/add_feed", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ name, url, type })
-        });
-
-        const data = await resp.json();
-        if(resp.status === 201){
-            alert("Custom feed added! Reloading data...");
+        const resp = await fetch(`/api/update_cache?minutes=${interval}`);
+        if(resp.ok){
+            alert("Cache updated!");
             loadCachedCVEs();
         } else {
-            alert(`Error adding feed: ${data.message || "Unknown error"}`);
+            alert("Failed to update cache");
         }
     } catch(e){
-        console.error("Error adding custom feed", e);
-        alert("Failed to add custom feed.");
+        console.error("Error updating cache", e);
+        alert("Failed to update cache");
     }
 });
+
+// ------------------ Last Updated ------------------
+function updateLastUpdated(){
+    if(allCVEs.length === 0) return;
+    const latest = allCVEs.reduce((a,b)=>{
+        const da = new Date(a.published_date||0);
+        const db = new Date(b.published_date||0);
+        return da>db ? a : b;
+    });
+    document.getElementById("last-updated").textContent = `Last updated: ${latest.published_date ? new Date(latest.published_date).toLocaleString() : "Unknown"}`;
+}
 
 // ------------------ Initialize ------------------
 loadCachedCVEs();
