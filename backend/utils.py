@@ -8,9 +8,8 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 
 DB_FILE = "data/threats.db"
-DEFAULT_CACHE_MINUTES = 30  # Default cache interval
+DEFAULT_CACHE_MINUTES = 30
 
-# Verified public feeds
 FEEDS = [
     {"url": "https://www.bleepingcomputer.com/feed/", "source": "BleepingComputer", "type": "Malware", "format": "rss"},
     {"url": "https://feeds.feedburner.com/GoogleChromeReleases", "source": "Google Chrome", "type": "Patch", "format": "rss"},
@@ -52,7 +51,7 @@ def get_cache_interval():
 def set_cache_interval(minutes):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("REPLACE INTO config(key, value) VALUES (?, ?)", ("cache_interval", str(minutes)))
+    c.execute("REPLACE INTO config(key,value) VALUES (?,?)", ("cache_interval", str(minutes)))
     conn.commit()
     conn.close()
 
@@ -61,7 +60,7 @@ def fetch_all_feeds():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
 
-    # Check last update
+    # Cache check
     c.execute("SELECT value FROM config WHERE key='last_update'")
     row = c.fetchone()
     now = datetime.utcnow()
@@ -86,16 +85,16 @@ def fetch_all_feeds():
         except Exception as e:
             print(f"Error fetching {feed['source']}: {e}")
 
-    c.execute("REPLACE INTO config(key, value) VALUES (?, ?)", ("last_update", now.isoformat()))
+    c.execute("REPLACE INTO config(key,value) VALUES (?,?)", ("last_update", now.isoformat()))
     conn.commit()
     conn.close()
     return get_all_threats()
 
-def upsert_threat(cursor, tid, title, description, link, source, ttype, pubdate):
-    cursor.execute('''
-        INSERT OR REPLACE INTO threats(id, title, description, link, source, type, published_date)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (tid, title, description, link, source, ttype, pubdate))
+def upsert_threat(c, tid, title, desc, link, source, ttype, pubdate):
+    c.execute('''
+        INSERT OR REPLACE INTO threats(id,title,description,link,source,type,published_date)
+        VALUES (?,?,?,?,?,?,?)
+    ''', (tid, title, desc, link, source, ttype, pubdate))
 
 def fetch_rss_feed(url):
     headers = {"User-Agent": "OpenThreatIQ/1.0"}
@@ -147,3 +146,4 @@ def mark_read(threat_id):
 
 def add_user_feed(url, source, ttype):
     FEEDS.append({"url": url, "source": source, "type": ttype, "format": "rss"})
+    fetch_all_feeds()
