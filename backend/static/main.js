@@ -1,141 +1,123 @@
-let cveData = [];
+// main.js
 
+let cveData = [];
+let currentModalId = null;
+
+// Fetch CVEs from backend
 async function fetchCVEs() {
-    const resp = await fetch("/api/cves");
-    cveData = await resp.json();
+    const response = await fetch("/api/cves");
+    cveData = await response.json();
     renderCVEs();
     populateFilters();
 }
 
+// Render CVE cards
 function renderCVEs() {
     const container = document.getElementById("cve-container");
     container.innerHTML = "";
-    cveData.forEach(cve => {
-        const div = document.createElement("div");
-        div.className = "cve-card col";
-        if (cve.read_flag) div.classList.add("read");
-        div.dataset.id = cve.id;
-        div.dataset.source = cve.source || "Unknown";
-        div.dataset.type = cve.type || "Unknown";
-        div.dataset.read = cve.read_flag ? "read" : "unread";
 
-        div.innerHTML = `
-            <div class="card h-100 p-2">
-                <div class="card-body">
-                    <h5>${cve.id}</h5>
-                    <div class="badges mb-1">
-                        <span class="badge bg-primary">${cve.type || "Unknown"}</span>
-                        <span class="badge bg-secondary">${cve.source || "Unknown"}</span>
-                    </div>
-                    <p class="cve-preview">${cve.description.substring(0, 120)}...</p>
-                    <small>${cve.published_date}</small>
-                </div>
-            </div>
-        `;
-        div.addEventListener("click", () => showModal(cve));
-        container.appendChild(div);
-    });
-    filterCVEs();
-}
-
-function showModal(cve) {
-    const modalBody = document.getElementById("modal-body-content");
-    modalBody.innerHTML = `
-        <p><strong>ID:</strong> ${cve.id}</p>
-        <p><strong>Type:</strong> ${cve.type}</p>
-        <p><strong>Source:</strong> ${cve.source}</p>
-        <p><strong>Published Date:</strong> ${cve.published_date}</p>
-        <hr>
-        <p>${cve.description}</p>
-        ${cve.link ? `<a href="${cve.link}" target="_blank">Read Full Article</a>` : ""}
-    `;
-    const myModal = new bootstrap.Modal(document.getElementById('cveModal'));
-    myModal.show();
-
-    if (!cve.read_flag) {
-        fetch(`/api/mark_read/${encodeURIComponent(cve.id)}`, { method: "POST" });
-        cve.read_flag = true;
-        document.querySelector(`[data-id="${cve.id}"]`).classList.add("read");
-    }
-}
-
-// Filters
-["source-filter","type-filter","read-filter"].forEach(id=>{
-    document.getElementById(id).addEventListener("change", filterCVEs);
-});
-document.getElementById("search-input").addEventListener("input", filterCVEs);
-
-function filterCVEs() {
     const sourceVal = document.getElementById("source-filter").value;
     const typeVal = document.getElementById("type-filter").value;
     const readVal = document.getElementById("read-filter").value;
     const searchVal = document.getElementById("search-input").value.toLowerCase();
 
-    document.querySelectorAll(".cve-card").forEach(card=>{
-        const matches = (!sourceVal || card.dataset.source===sourceVal)
-            && (!typeVal || card.dataset.type===typeVal)
-            && (!readVal || card.dataset.read===readVal)
-            && (!searchVal || card.querySelector(".cve-preview").textContent.toLowerCase().includes(searchVal));
-        card.style.display = matches ? "block" : "none";
+    cveData.forEach(cve => {
+        // Apply filters
+        if ((sourceVal && cve.source !== sourceVal) ||
+            (typeVal && cve.type !== typeVal) ||
+            (readVal && (cve.read_flag ? "read" : "unread") !== readVal) ||
+            (searchVal && !cve.description.toLowerCase().includes(searchVal))) {
+            return;
+        }
+
+        const div = document.createElement("div");
+        div.className = "cve-card";
+        if (cve.read_flag) div.classList.add("read");
+        div.dataset.id = cve.id;
+        div.dataset.read = cve.read_flag ? "read" : "unread";
+        div.dataset.source = cve.source;
+        div.dataset.type = cve.type;
+
+        div.innerHTML = `
+            <h5>${cve.id}</h5>
+            <p class="cve-preview">${cve.description.length > 200 ? cve.description.substring(0, 200) + "..." : cve.description}</p>
+            <small>${cve.publishedDate}</small>
+            <div class="badges"><span class="badge badge-info">${cve.type}</span><span class="badge badge-secondary">${cve.source}</span></div>
+        `;
+
+        div.addEventListener("click", () => markAsReadAndShowModal(cve, div));
+
+        container.appendChild(div);
     });
 }
 
-function populateFilters() {
-    const sources = [...new Set(cveData.map(cve => cve.source || "Unknown"))];
-    const types = [...new Set(cveData.map(cve => cve.type || "Unknown"))];
+// Mark card as read and show modal
+function markAsReadAndShowModal(cve, cardDiv) {
+    if (!cve.read_flag) {
+        fetch("/api/mark_read", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({id: cve.id, read: true})
+        })
+        .then(res => res.json())
+        .then(data => {
+            cve.read_flag = true;
+            cardDiv.dataset.read = "read";
+            cardDiv.classList.add("read");
+        })
+        .catch(err => console.error(err));
+    }
 
-    const sourceSelect = document.getElementById("source-filter");
-    const typeSelect = document.getElementById("type-filter");
-    sourceSelect.innerHTML = '<option value="">All Sources</option>';
-    sources.forEach(s=>sourceSelect.innerHTML+=`<option value="${s}">${s}</option>`);
-    typeSelect.innerHTML = '<option value="">All Types</option>';
-    types.forEach(t=>typeSelect.innerHTML+=`<option value="${t}">${t}</option>`);
+    showCveModal(cve);
 }
+
+// Show modal with full CVE info
+function showCveModal(cve) {
+    const modal = document.getElementById("cve-modal");
+    document.getElementById("modal-title").innerText = cve.id;
+    document.getElementById("modal-source").innerText = `Source: ${cve.source}`;
+    document.getElementById("modal-type").innerText = `Type: ${cve.type}`;
+    document.getElementById("modal-date").innerText = `Published: ${cve.publishedDate}`;
+    document.getElementById("modal-desc").innerText = cve.description;
+    modal.style.display = "block";
+}
+
+// Close modal
+document.getElementById("modal-close").addEventListener("click", () => {
+    document.getElementById("cve-modal").style.display = "none";
+});
+
+// Populate filter dropdowns
+function populateFilters() {
+    const sourceSet = new Set();
+    const typeSet = new Set();
+    cveData.forEach(cve => {
+        sourceSet.add(cve.source || "Unknown");
+        typeSet.add(cve.type || "Unknown");
+    });
+
+    const sourceFilter = document.getElementById("source-filter");
+    const typeFilter = document.getElementById("type-filter");
+    sourceFilter.innerHTML = "<option value=''>All Sources</option>";
+    typeFilter.innerHTML = "<option value=''>All Types</option>";
+
+    [...sourceSet].forEach(src => {
+        sourceFilter.innerHTML += `<option value="${src}">${src}</option>`;
+    });
+    [...typeSet].forEach(t => {
+        typeFilter.innerHTML += `<option value="${t}">${t}</option>`;
+    });
+}
+
+// Event listeners for filters and search
+document.getElementById("source-filter").addEventListener("change", renderCVEs);
+document.getElementById("type-filter").addEventListener("change", renderCVEs);
+document.getElementById("read-filter").addEventListener("change", renderCVEs);
+document.getElementById("search-input").addEventListener("input", renderCVEs);
 
 // Dark mode toggle
-document.getElementById("dark-toggle").addEventListener("click", ()=>{
+document.getElementById("dark-toggle").addEventListener("click", () => {
     document.body.classList.toggle("dark-mode");
-});
-
-// Update cache interval
-document.getElementById("update-cache").addEventListener("click", async ()=>{
-    const minutes = document.getElementById("cache-interval").value;
-    if (!minutes || isNaN(minutes)) return alert("Enter valid minutes");
-    const resp = await fetch("/api/set_cache_interval", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({minutes})
-    });
-    const data = await resp.json();
-    if(data.status==="ok") alert(`Cache refresh set to ${data.minutes} minutes`);
-});
-
-// Mark all read
-document.getElementById("mark-all-read").addEventListener("click", async ()=>{
-    for(const cve of cveData.filter(c=>!c.read_flag)){
-        await fetch(`/api/mark_read/${encodeURIComponent(cve.id)}`, { method:"POST" });
-        cve.read_flag = true;
-    }
-    renderCVEs();
-});
-
-// Add custom feed
-document.getElementById("save-feed").addEventListener("click", async ()=>{
-    const url = document.getElementById("feed-url").value;
-    const source = document.getElementById("feed-source").value || "User Feed";
-    const type = document.getElementById("feed-type").value || "Other";
-    if(!url) return alert("Feed URL required");
-    const resp = await fetch("/api/add_feed", {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({url, source, type})
-    });
-    const data = await resp.json();
-    if(data.status==="ok"){
-        alert("Feed added!");
-        fetchCVEs();
-        bootstrap.Modal.getInstance(document.getElementById('addFeedModal')).hide();
-    }
 });
 
 fetchCVEs();
