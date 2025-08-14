@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 
 DB_FILE = "data/threats.db"
-CACHE_EXPIRY_MINUTES = 30  # Default; user-configurable
+DEFAULT_CACHE_MINUTES = 30  # Default cache interval
 
 # Verified public feeds
 FEEDS = [
@@ -17,7 +17,6 @@ FEEDS = [
     {"url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "source": "NVD", "type": "CVE", "format": "json"}
 ]
 
-# Initialize DB
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -42,7 +41,21 @@ def init_db():
     conn.commit()
     conn.close()
 
-# Fetch all feeds
+def get_cache_interval():
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("SELECT value FROM config WHERE key='cache_interval'")
+    row = c.fetchone()
+    conn.close()
+    return int(row[0]) if row else DEFAULT_CACHE_MINUTES
+
+def set_cache_interval(minutes):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    c.execute("REPLACE INTO config(key, value) VALUES (?, ?)", ("cache_interval", str(minutes)))
+    conn.commit()
+    conn.close()
+
 def fetch_all_feeds():
     init_db()
     conn = sqlite3.connect(DB_FILE)
@@ -63,12 +76,12 @@ def fetch_all_feeds():
     for feed in FEEDS:
         try:
             if feed["format"] == "rss":
-                data = fetch_rss_feed(feed["url"])
-                for item in data:
+                items = fetch_rss_feed(feed["url"])
+                for item in items:
                     upsert_threat(c, item["id"], item["title"], item["description"], item["link"], feed["source"], feed["type"], item["published_date"])
             elif feed["format"] == "json":
-                data = fetch_nvd_json(feed["url"])
-                for item in data:
+                items = fetch_nvd_json(feed["url"])
+                for item in items:
                     upsert_threat(c, item["id"], item["id"], item["description"], "", feed["source"], feed["type"], item["publishedDate"])
         except Exception as e:
             print(f"Error fetching {feed['source']}: {e}")
@@ -134,18 +147,3 @@ def mark_read(threat_id):
 
 def add_user_feed(url, source, ttype):
     FEEDS.append({"url": url, "source": source, "type": ttype, "format": "rss"})
-
-def get_cache_interval():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT value FROM config WHERE key='cache_interval'")
-    row = c.fetchone()
-    conn.close()
-    return int(row[0]) if row else CACHE_EXPIRY_MINUTES
-
-def set_cache_interval(minutes):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("REPLACE INTO config(key, value) VALUES (?, ?)", ("cache_interval", str(minutes)))
-    conn.commit()
-    conn.close()
