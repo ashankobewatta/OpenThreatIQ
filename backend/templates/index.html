@@ -4,58 +4,60 @@
     <meta charset="UTF-8">
     <title>OpenThreatIQ Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
 <body>
-<div class="container my-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>OpenThreatIQ Dashboard</h2>
-        <button id="darkModeToggle" class="btn btn-outline-dark">Dark Mode</button>
+<nav class="navbar navbar-expand-lg navbar-light bg-light px-3">
+    <a class="navbar-brand" href="#">OpenThreatIQ</a>
+    <div class="ms-auto">
+        <button id="darkModeToggle" class="btn btn-sm btn-outline-secondary">Toggle Dark Mode</button>
     </div>
+</nav>
 
-    <div class="row g-3 mb-3">
-        <div class="col-md-4">
-            <label for="sourceFilter">Source</label>
-            <select id="sourceFilter" class="form-select">
+<div class="container mt-3">
+
+    <!-- Filters -->
+    <div class="row mb-3 g-2">
+        <div class="col-md-3">
+            <label for="filterSource" class="form-label fw-bold">Source</label>
+            <select id="filterSource" class="form-select"><option value="">All</option></select>
+        </div>
+        <div class="col-md-3">
+            <label for="filterType" class="form-label fw-bold">Type</label>
+            <select id="filterType" class="form-select"><option value="">All</option></select>
+        </div>
+        <div class="col-md-3">
+            <label for="filterRead" class="form-label fw-bold">Read Status</label>
+            <select id="filterRead" class="form-select">
                 <option value="">All</option>
+                <option value="read">Read</option>
+                <option value="unread">Unread</option>
             </select>
         </div>
-        <div class="col-md-4">
-            <label for="typeFilter">Type</label>
-            <select id="typeFilter" class="form-select">
-                <option value="">All</option>
-            </select>
-        </div>
-        <div class="col-md-4">
-            <label for="readFilter">Read Status</label>
-            <select id="readFilter" class="form-select">
-                <option value="">All</option>
-                <option value="0">Unread</option>
-                <option value="1">Read</option>
-            </select>
-        </div>
-        <div class="col-12 mt-2">
+        <div class="col-md-3">
+            <label for="searchInput" class="form-label fw-bold">Search</label>
             <input type="text" id="searchInput" class="form-control" placeholder="Search threats...">
         </div>
     </div>
 
-    <div id="threat-container" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3"></div>
+    <!-- Threat cards -->
+    <div id="threat-container" class="row g-3"></div>
 </div>
 
-<!-- Modal for full description -->
+<!-- Modal -->
 <div class="modal fade" id="threatModal" tabindex="-1" aria-labelledby="threatModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+  <div class="modal-dialog modal-lg">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="threatModalLabel"></h5>
+        <h5 class="modal-title" id="threatModalLabel">Threat Details</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body" id="threatModalBody"></div>
+      <div class="modal-body" id="modalContent"></div>
     </div>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="/static/main.js"></script>
+<script src="{{ url_for('static', filename='main.js') }}"></script>
 </body>
 </html>
