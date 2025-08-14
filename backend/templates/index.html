@@ -3,57 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <title>OpenThreatIQ Dashboard</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-<div class="container py-4">
-
+<div class="container my-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h1>OpenThreatIQ</h1>
-        <button id="darkModeToggle" class="btn btn-outline-secondary">Toggle Dark Mode</button>
+        <h1>OpenThreatIQ - Threat Intelligence Dashboard</h1>
+        <button id="dark-mode-toggle" class="btn btn-secondary">Toggle Dark Mode</button>
     </div>
 
-    <div class="row mb-3">
+    <div class="row mb-3 g-3">
         <div class="col-md-4">
-            <label class="form-label">Search Threats</label>
-            <input id="searchInput" type="text" class="form-control" placeholder="Search...">
+            <label for="search-input" class="form-label">Search</label>
+            <input type="text" id="search-input" class="form-control" placeholder="Search threats...">
         </div>
         <div class="col-md-3">
-            <label class="form-label">Source Filter</label>
-            <select id="sourceFilter" class="form-select"><option value="">All Sources</option></select>
-        </div>
-        <div class="col-md-3">
-            <label class="form-label">Type Filter</label>
-            <select id="typeFilter" class="form-select"><option value="">All Types</option></select>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">Read Filter</label>
-            <select id="readFilter" class="form-select">
-                <option value="">All</option>
-                <option value="0">Unread</option>
-                <option value="1">Read</option>
+            <label for="type-filter" class="form-label">Type Filter</label>
+            <select id="type-filter" class="form-select">
+                <option value="">All Types</option>
             </select>
         </div>
-    </div>
-
-    <div class="row mb-3">
-        <div class="col-md-4">
-            <label class="form-label">Add Custom Feed</label>
-            <div class="input-group">
-                <input id="newFeedName" type="text" class="form-control" placeholder="Name">
-                <input id="newFeedURL" type="text" class="form-control" placeholder="URL">
-                <button id="addFeedBtn" class="btn btn-primary">Add</button>
-            </div>
+        <div class="col-md-3">
+            <label for="source-filter" class="form-label">Source Filter</label>
+            <select id="source-filter" class="form-select">
+                <option value="">All Sources</option>
+            </select>
         </div>
-        <div class="col-md-4">
-            <label class="form-label">Cache Refresh Interval (minutes)</label>
-            <select id="cacheInterval" class="form-select">
-                <option value="5">5</option>
-                <option value="10">10</option>
-                <option value="15">15</option>
-                <option value="30" selected>30</option>
-                <option value="60">60</option>
+        <div class="col-md-2">
+            <label for="read-filter" class="form-label">Read Filter</label>
+            <select id="read-filter" class="form-select">
+                <option value="">All</option>
+                <option value="read">Read</option>
+                <option value="unread">Unread</option>
             </select>
         </div>
     </div>
@@ -61,24 +43,29 @@
     <div id="cve-container" class="row"></div>
 </div>
 
-<!-- Modal for full details -->
-<div class="modal fade" id="threatModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-lg">
+<!-- Modal for full threat info -->
+<div class="modal fade" id="threat-modal" tabindex="-1" aria-labelledby="threatModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-centered">
     <div class="modal-content">
       <div class="modal-header">
-        <h5 class="modal-title" id="modalTitle"></h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        <h5 class="modal-title" id="modal-title">Threat Title</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body" id="modalBody"></div>
+      <div class="modal-body">
+        <p><strong>Source:</strong> <span id="modal-source"></span></p>
+        <p><strong>Type:</strong> <span id="modal-type"></span></p>
+        <p><strong>Published:</strong> <span id="modal-date"></span></p>
+        <p id="modal-description"></p>
+      </div>
       <div class="modal-footer">
-        <a id="modalLink" class="btn btn-primary" target="_blank">Go to Source</a>
+        <a id="modal-link" href="#" target="_blank" class="btn btn-primary">Go to Source</a>
         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="{{ url_for('static', filename='main.js') }}"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="main.js"></script>
 </body>
 </html>
