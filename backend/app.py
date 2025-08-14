@@ -6,12 +6,10 @@ import logging
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Ensure paths are relative to backend folder
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.path.join(BASE_DIR, "data")
-os.makedirs(DATA_DIR, exist_ok=True)
-
 app = Flask(__name__, template_folder="templates", static_folder="static")
+
+# Ensure data folder exists inside the app
+os.makedirs(os.path.join(os.path.dirname(__file__), "data"), exist_ok=True)
 
 # Fetch feeds on startup
 try:
