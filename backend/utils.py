@@ -1,10 +1,10 @@
-import requests, json, os, gzip, io, sqlite3
+import requests, json, os, gzip, io, sqlite3, threading, time
 from datetime import datetime, timedelta, timezone
 import xml.etree.ElementTree as ET
 
 DB_FILE = "data/threatiq.db"
 CACHE_SETTINGS_FILE = "data/cache_settings.json"
-DEFAULT_CACHE_EXPIRY_MINUTES = 30
+DEFAULT_CACHE_EXPIRY_MINUTES = 10
 
 FEED_URLS = [
     {"name": "NVD", "url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "type": "CVE"},
@@ -110,8 +110,6 @@ def fetch_all_feeds():
                     }
                     save_cve_entry(entry)
                     all_entries.append(entry)
-        except requests.exceptions.SSLError as ssl_err:
-            print(f"SSL Error fetching {feed['name']}: {ssl_err}")
         except Exception as e:
             print(f"Error fetching {feed['name']}: {e}")
 
@@ -168,3 +166,16 @@ def mark_cve_read(cve_id):
     cur.execute("UPDATE cve_entries SET read_flag=1 WHERE id=?", (cve_id,))
     conn.commit()
     conn.close()
+
+# ---------------- Background Auto-Refresh ----------------
+def start_background_refresh():
+    def refresh_loop():
+        while True:
+            try:
+                fetch_all_feeds()
+            except Exception as e:
+                print(f"Error in background refresh: {e}")
+            interval = get_cache_interval() * 60
+            time.sleep(interval)
+    thread = threading.Thread(target=refresh_loop, daemon=True)
+    thread.start()
