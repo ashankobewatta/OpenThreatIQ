@@ -1,15 +1,17 @@
-/* Reset some defaults */
+/* Reset */
 * {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
 }
 
+/* Light Mode (default) */
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background: #f0f2f5;
-    padding: 20px;
     color: #333;
+    padding: 20px;
+    transition: background 0.3s, color 0.3s;
 }
 
 h1 {
@@ -19,22 +21,24 @@ h1 {
     font-weight: 600;
 }
 
-/* Filters container */
+/* Filters */
 .filters {
     display: flex;
     gap: 15px;
     justify-content: center;
-    margin-bottom: 30px;
+    margin-bottom: 20px;
     flex-wrap: wrap;
 }
 
 .filters input,
-.filters select {
+.filters select,
+#dark-mode-toggle {
     padding: 10px 15px;
     border-radius: 8px;
     border: 1px solid #ccc;
     font-size: 0.95rem;
     transition: all 0.2s ease-in-out;
+    cursor: pointer;
 }
 
 .filters input:focus,
@@ -51,8 +55,9 @@ h1 {
     margin: 12px auto;
     border-radius: 12px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-    transition: transform 0.2s, box-shadow 0.2s;
+    transition: transform 0.2s, box-shadow 0.2s, background 0.3s, color 0.3s;
     max-width: 800px;
+    position: relative;
 }
 
 .cve-card:hover {
@@ -67,4 +72,64 @@ h1 {
 }
 
 .cve-card p {
-    font-s
+    font-size: 0.95rem;
+    margin-bottom: 10px;
+    line-height: 1.4;
+}
+
+.cve-card small {
+    font-size: 0.8rem;
+    color: #555;
+}
+
+/* Badges for type */
+.badge {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    margin-left: 5px;
+    color: #fff;
+}
+
+.badge.CVE { background: #007BFF; }
+.badge.Malware { background: #dc3545; }
+.badge.Phishing { background: #fd7e14; }
+.badge.Exploit { background: #6f42c1; }
+.badge.Update { background: #28a745; }
+
+/* Container fade-in */
+#cve-container {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+@keyframes fadeIn { from {opacity:0;} to {opacity:1;} }
+
+/* Dark Mode */
+body.dark-mode {
+    background: #121212;
+    color: #ddd;
+}
+
+body.dark-mode .cve-card {
+    background: #1e1e1e;
+    color: #ddd;
+    box-shadow: 0 4px 12px rgba(255,255,255,0.05);
+}
+
+body.dark-mode .cve-card h3 {
+    color: #66b0ff;
+}
+
+body.dark-mode .cve-card small {
+    color: #aaa;
+}
+
+/* Responsive */
+@media (max-width: 600px) {
+    .filters {
+        flex-direction: column;
+        gap: 10px;
+    }
+}
