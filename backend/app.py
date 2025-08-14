@@ -2,7 +2,7 @@
 from flask import Flask, jsonify, render_template
 from utils import fetch_cves
 
-app = Flask(__name__)
+app = Flask(app = Flask(__name__, template_folder="../frontend"))
 
 @app.route("/")
 def index():
