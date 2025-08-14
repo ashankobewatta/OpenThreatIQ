@@ -1,18 +1,25 @@
 let allCVEs = [];
 
-async function fetchCVEs() {
-    const response = await fetch("/api/cves");
-    allCVEs = await response.json();
+// ------------------ Load cached data ------------------
+async function loadCachedCVEs() {
+    try {
+        const response = await fetch("/api/cves"); // Reads backend cache
+        allCVEs = await response.json();
+    } catch (e) {
+        console.error("Error fetching cache, using empty list.", e);
+        allCVEs = [];
+    }
     populateFilters();
     renderCVEs(allCVEs);
 }
 
+// ------------------ Populate dropdowns ------------------
 function populateFilters() {
     const sourceSelect = document.getElementById("filter-source");
     const typeSelect = document.getElementById("filter-type");
 
-    const sources = Array.from(new Set(allCVEs.map(c => c.source))).sort();
-    const types = Array.from(new Set(allCVEs.map(c => c.type))).sort();
+    const sources = Array.from(new Set(allCVEs.map(c => c.source || "Unknown"))).sort();
+    const types = Array.from(new Set(allCVEs.map(c => c.type || "Update"))).sort();
 
     sources.forEach(s => {
         const option = document.createElement("option");
@@ -29,20 +36,26 @@ function populateFilters() {
     });
 }
 
+// ------------------ Render CVEs ------------------
 function renderCVEs(cves) {
     const container = document.getElementById("cve-container");
     container.innerHTML = "";
 
-    // Sort by publishedDate descending
-    cves.sort((a, b) => new Date(b.publishedDate) - new Date(a.publishedDate));
+    cves.sort((a, b) => new Date(b.publishedDate || 0) - new Date(a.publishedDate || 0));
 
     cves.forEach(cve => {
         const div = document.createElement("div");
         div.className = "cve-card";
-        const badge = `<span class="badge ${cve.type}">${cve.type}</span>`;
-        div.innerHTML = `${badge}<h3>${cve.id || "N/A"}</h3>
-                         <p>${cve.description || "No description available"}</p>
-                         <small>${cve.publishedDate ? new Date(cve.publishedDate).toLocaleString() : ""} | ${cve.source}</small>`;
+
+        const type = cve.type || "Update";
+        const badge = `<span class="badge ${type}">${type}</span>`;
+
+        div.innerHTML = `
+            ${badge}
+            <h3>${cve.id || "N/A"}</h3>
+            <p>${cve.description || "No description available"}</p>
+            <small>${cve.publishedDate ? new Date(cve.publishedDate).toLocaleString() : ""} | ${cve.source || "Unknown"}</small>
+        `;
         container.appendChild(div);
     });
 }
@@ -58,10 +71,10 @@ function applyFilters() {
     const type = document.getElementById("filter-type").value;
 
     const filtered = allCVEs.filter(cve => {
-        const matchesSearch = cve.id.toLowerCase().includes(searchTerm) ||
-                              cve.description.toLowerCase().includes(searchTerm);
-        const matchesSource = !source || cve.source === source;
-        const matchesType = !type || cve.type === type;
+        const matchesSearch = (cve.id || "").toLowerCase().includes(searchTerm) ||
+                              (cve.description || "").toLowerCase().includes(searchTerm);
+        const matchesSource = !source || (cve.source || "Unknown") === source;
+        const matchesType = !type || (cve.type || "Update") === type;
         return matchesSearch && matchesSource && matchesType;
     });
 
@@ -74,4 +87,4 @@ document.getElementById("dark-mode-toggle").addEventListener("click", () => {
 });
 
 // ------------------ Init ------------------
-fetchCVEs();
+loadCachedCVEs();
