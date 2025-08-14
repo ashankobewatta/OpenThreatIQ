@@ -3,25 +3,47 @@
 <head>
     <meta charset="UTF-8">
     <title>OpenThreatIQ Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
 </head>
-<body>
-    <header>
-        <h1>OpenThreatIQ - Threat Intelligence Dashboard</h1>
-        <div class="controls">
-            <input type="text" id="search" placeholder="Search CVEs, Malware, Phishing..." />
-            <select id="filter-source">
-                <option value="">All Sources</option>
-            </select>
-            <select id="filter-type">
-                <option value="">All Types</option>
-            </select>
-            <button id="dark-mode-toggle">Dark Mode</button>
-        </div>
-    </header>
-    <main>
-        <div id="cve-container" class="grid"></div>
-    </main>
+<body class="bg-light">
+    <div class="container py-4">
+        <header class="d-flex flex-column align-items-center mb-4">
+            <h1 class="mb-3">OpenThreatIQ Dashboard</h1>
+            <div class="d-flex flex-wrap gap-2 w-100 justify-content-center">
+                <input type="text" id="search" class="form-control form-control-sm" placeholder="Search CVEs, Malware, Phishing...">
+                <select id="filter-source" class="form-select form-select-sm">
+                    <option value="">All Sources</option>
+                </select>
+                <select id="filter-type" class="form-select form-select-sm">
+                    <option value="">All Types</option>
+                </select>
+                <button id="dark-mode-toggle" class="btn btn-sm btn-secondary">Dark Mode</button>
+            </div>
+        </header>
+
+        <!-- Add custom feed -->
+        <section class="mb-4">
+            <h5>Add Custom Feed</h5>
+            <div class="d-flex gap-2 flex-wrap">
+                <input type="text" id="custom-source" placeholder="Source Name" class="form-control form-control-sm">
+                <input type="text" id="custom-url" placeholder="Feed URL" class="form-control form-control-sm">
+                <select id="custom-type" class="form-select form-select-sm">
+                    <option value="CVE">CVE</option>
+                    <option value="Malware">Malware</option>
+                    <option value="Phishing">Phishing</option>
+                    <option value="Exploit">Exploit</option>
+                    <option value="Update">Update</option>
+                </select>
+                <button id="add-feed-btn" class="btn btn-sm btn-primary">Add Feed</button>
+            </div>
+        </section>
+
+        <main>
+            <div id="cve-container" class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3"></div>
+        </main>
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='main.js') }}"></script>
 </body>
 </html>
