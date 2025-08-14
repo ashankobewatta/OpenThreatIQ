@@ -1,123 +1,89 @@
-// main.js
+let threats = [];
+let darkMode = false;
 
-let cveData = [];
-let currentModalId = null;
+const searchBar = document.getElementById("search-bar");
+const filterSource = document.getElementById("filter-source");
+const filterType = document.getElementById("filter-type");
+const filterRead = document.getElementById("filter-read");
+const container = document.getElementById("threat-container");
+const modalDescription = document.getElementById("modal-description");
+const threatModal = new bootstrap.Modal(document.getElementById('threatModal'));
 
-// Fetch CVEs from backend
-async function fetchCVEs() {
-    const response = await fetch("/api/cves");
-    cveData = await response.json();
-    renderCVEs();
+async function fetchThreats() {
+    const res = await fetch("/api/threats");
+    threats = await res.json();
     populateFilters();
+    renderThreats();
 }
 
-// Render CVE cards
-function renderCVEs() {
-    const container = document.getElementById("cve-container");
+function populateFilters() {
+    const sources = new Set(["All"]);
+    const types = new Set(["All"]);
+    threats.forEach(t => {
+        sources.add(t.source || "Unknown");
+        types.add(t.type || "Unknown");
+    });
+
+    filterSource.innerHTML = Array.from(sources).map(s => `<option value="${s}">${s}</option>`).join("");
+    filterType.innerHTML = Array.from(types).map(t => `<option value="${t}">${t}</option>`).join("");
+}
+
+function renderThreats() {
+    const searchText = searchBar.value.toLowerCase();
+    const selectedSource = filterSource.value;
+    const selectedType = filterType.value;
+    const selectedRead = filterRead.value;
+
     container.innerHTML = "";
 
-    const sourceVal = document.getElementById("source-filter").value;
-    const typeVal = document.getElementById("type-filter").value;
-    const readVal = document.getElementById("read-filter").value;
-    const searchVal = document.getElementById("search-input").value.toLowerCase();
+    threats.forEach(t => {
+        if (selectedSource !== "All" && t.source !== selectedSource) return;
+        if (selectedType !== "All" && t.type !== selectedType) return;
+        if (selectedRead === "Read" && t.read_flag !== 1) return;
+        if (selectedRead === "Unread" && t.read_flag !== 0) return;
+        if (searchText && !(t.title.toLowerCase().includes(searchText) || t.description.toLowerCase().includes(searchText))) return;
 
-    cveData.forEach(cve => {
-        // Apply filters
-        if ((sourceVal && cve.source !== sourceVal) ||
-            (typeVal && cve.type !== typeVal) ||
-            (readVal && (cve.read_flag ? "read" : "unread") !== readVal) ||
-            (searchVal && !cve.description.toLowerCase().includes(searchVal))) {
-            return;
-        }
-
-        const div = document.createElement("div");
-        div.className = "cve-card";
-        if (cve.read_flag) div.classList.add("read");
-        div.dataset.id = cve.id;
-        div.dataset.read = cve.read_flag ? "read" : "unread";
-        div.dataset.source = cve.source;
-        div.dataset.type = cve.type;
-
-        div.innerHTML = `
-            <h5>${cve.id}</h5>
-            <p class="cve-preview">${cve.description.length > 200 ? cve.description.substring(0, 200) + "..." : cve.description}</p>
-            <small>${cve.publishedDate}</small>
-            <div class="badges"><span class="badge badge-info">${cve.type}</span><span class="badge badge-secondary">${cve.source}</span></div>
+        const card = document.createElement("div");
+        card.className = "col-md-4";
+        card.innerHTML = `
+            <div class="card threat-card ${t.read_flag ? 'read' : 'unread'}">
+                <div class="card-body">
+                    <h5 class="card-title">${t.title}</h5>
+                    <span class="badge bg-primary">${t.type || "Unknown"}</span>
+                    <span class="badge bg-secondary">${t.source || "Unknown"}</span>
+                    <p class="card-text">${t.description.substring(0, 100)}...</p>
+                    <button class="btn btn-sm btn-outline-primary btn-view">View</button>
+                    <button class="btn btn-sm btn-outline-success btn-read">${t.read_flag ? 'Mark Unread' : 'Mark Read'}</button>
+                </div>
+            </div>
         `;
+        container.appendChild(card);
 
-        div.addEventListener("click", () => markAsReadAndShowModal(cve, div));
+        card.querySelector(".btn-view").addEventListener("click", () => {
+            modalDescription.innerHTML = t.description;
+            threatModal.show();
+        });
 
-        container.appendChild(div);
+        card.querySelector(".btn-read").addEventListener("click", async () => {
+            await fetch("/api/mark_read", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({id: t.id})
+            });
+            t.read_flag = t.read_flag ? 0 : 1;
+            renderThreats();
+        });
     });
 }
 
-// Mark card as read and show modal
-function markAsReadAndShowModal(cve, cardDiv) {
-    if (!cve.read_flag) {
-        fetch("/api/mark_read", {
-            method: "POST",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({id: cve.id, read: true})
-        })
-        .then(res => res.json())
-        .then(data => {
-            cve.read_flag = true;
-            cardDiv.dataset.read = "read";
-            cardDiv.classList.add("read");
-        })
-        .catch(err => console.error(err));
-    }
+searchBar.addEventListener("input", renderThreats);
+filterSource.addEventListener("change", renderThreats);
+filterType.addEventListener("change", renderThreats);
+filterRead.addEventListener("change", renderThreats);
 
-    showCveModal(cve);
-}
-
-// Show modal with full CVE info
-function showCveModal(cve) {
-    const modal = document.getElementById("cve-modal");
-    document.getElementById("modal-title").innerText = cve.id;
-    document.getElementById("modal-source").innerText = `Source: ${cve.source}`;
-    document.getElementById("modal-type").innerText = `Type: ${cve.type}`;
-    document.getElementById("modal-date").innerText = `Published: ${cve.publishedDate}`;
-    document.getElementById("modal-desc").innerText = cve.description;
-    modal.style.display = "block";
-}
-
-// Close modal
-document.getElementById("modal-close").addEventListener("click", () => {
-    document.getElementById("cve-modal").style.display = "none";
-});
-
-// Populate filter dropdowns
-function populateFilters() {
-    const sourceSet = new Set();
-    const typeSet = new Set();
-    cveData.forEach(cve => {
-        sourceSet.add(cve.source || "Unknown");
-        typeSet.add(cve.type || "Unknown");
-    });
-
-    const sourceFilter = document.getElementById("source-filter");
-    const typeFilter = document.getElementById("type-filter");
-    sourceFilter.innerHTML = "<option value=''>All Sources</option>";
-    typeFilter.innerHTML = "<option value=''>All Types</option>";
-
-    [...sourceSet].forEach(src => {
-        sourceFilter.innerHTML += `<option value="${src}">${src}</option>`;
-    });
-    [...typeSet].forEach(t => {
-        typeFilter.innerHTML += `<option value="${t}">${t}</option>`;
-    });
-}
-
-// Event listeners for filters and search
-document.getElementById("source-filter").addEventListener("change", renderCVEs);
-document.getElementById("type-filter").addEventListener("change", renderCVEs);
-document.getElementById("read-filter").addEventListener("change", renderCVEs);
-document.getElementById("search-input").addEventListener("input", renderCVEs);
-
-// Dark mode toggle
 document.getElementById("dark-toggle").addEventListener("click", () => {
-    document.body.classList.toggle("dark-mode");
+    darkMode = !darkMode;
+    document.body.classList.toggle("dark-mode", darkMode);
 });
 
-fetchCVEs();
+fetchThreats();
