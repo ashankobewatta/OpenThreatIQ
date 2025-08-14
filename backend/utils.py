@@ -80,17 +80,34 @@ def fetch_rss_feed(url):
     resp.raise_for_status()
     feed = feedparser.parse(resp.content)
     items = []
+
     for entry in feed.entries:
+        # Prefer full content if available
         content = entry.get("content", [{}])[0].get("value") or entry.get("summary", "")
         content = BeautifulSoup(content, "html.parser").get_text()
+
+        # For trusted sources, attempt to fetch full article from the page
+        if "bleepingcomputer.com" in entry.link:
+            try:
+                page_resp = requests.get(entry.link, headers=headers, timeout=10)
+                page_resp.raise_for_status()
+                soup = BeautifulSoup(page_resp.text, "html.parser")
+                full_article = soup.find("div", class_="article-content")
+                if full_article:
+                    content = full_article.get_text(separator="\n").strip()
+            except Exception as e:
+                print(f"Failed to fetch full article from {entry.link}: {e}")
+                # fallback to RSS summary
+
         items.append({
             "id": entry.get("id") or entry.get("link"),
             "title": entry.get("title"),
-            "description": content,
+            "description": content,  # store full content
             "link": entry.get("link"),
             "published_date": entry.get("published") or entry.get("updated") or ""
         })
     return items
+
 
 def fetch_nvd_json(url):
     headers = {"User-Agent": "OpenThreatIQ/1.0"}
