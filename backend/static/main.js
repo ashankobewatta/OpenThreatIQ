@@ -82,7 +82,7 @@ document.getElementById("update-cache").addEventListener("click", async () => {
     });
 
     const data = await resp.json();
-    if (data.status === "ok") alert(`Cache interval updated to ${data.minutes} minutes`);
+    if (data.status === "ok") alert(`Auto-refresh set to every ${data.minutes} minutes`);
     else alert("Failed to update cache interval");
 });
 
