@@ -4,23 +4,24 @@ import os
 import gzip
 import io
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 DB_FILE = "data/threatiq.db"
+DEFAULT_CACHE_EXPIRY_MINUTES = 30  # default cache expiry
+
+# Verified free public feeds
 FEED_URLS = [
     {"name": "NVD", "url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "type": "CVE"},
     {"name": "Beeping Computer", "url": "https://www.beepingcomputer.com/feed/", "type": "Update"},
     {"name": "Google Security Blog", "url": "https://security.googleblog.com/feeds/posts/default", "type": "Update"},
     {"name": "Microsoft Security", "url": "https://msrc.microsoft.com/update-guide/rss", "type": "Update"}
 ]
-CACHE_EXPIRY_HOURS = 24
 
 # ------------------ DB Setup ------------------
 def init_db():
     os.makedirs("data", exist_ok=True)
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
-    # CVE entries
     cur.execute("""
         CREATE TABLE IF NOT EXISTS cve_entries (
             id TEXT PRIMARY KEY,
@@ -31,7 +32,6 @@ def init_db():
             read_flag INTEGER DEFAULT 0
         )
     """)
-    # Custom feeds
     cur.execute("""
         CREATE TABLE IF NOT EXISTS custom_feeds (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,19 +43,21 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ------------------ Fetch NVD/GLOBAL feeds ------------------
-def fetch_all_feeds():
+# ------------------ Fetch all feeds ------------------
+def fetch_all_feeds(cache_expiry_minutes=DEFAULT_CACHE_EXPIRY_MINUTES):
     init_db()
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
 
-    # Check if cache is fresh
+    # Check cache freshness
     cur.execute("SELECT MAX(published_date) FROM cve_entries")
     last_date_row = cur.fetchone()
     if last_date_row and last_date_row[0]:
-        last_date = datetime.fromisoformat(last_date_row[0])
-        if datetime.now() - last_date < timedelta(hours=CACHE_EXPIRY_HOURS):
-            print(f"[{datetime.now().isoformat()}] Using cached CVEs from DB")
+        last_date = datetime.fromisoformat(last_date_row[0].replace("Z", "+00:00"))
+        now_utc = datetime.now(timezone.utc)
+        expiry_delta = timedelta(minutes=cache_expiry_minutes)
+        if now_utc - last_date < expiry_delta:
+            print(f"[{now_utc.isoformat()}] Using cached CVEs from DB")
             conn.close()
             return get_all_cves()
 
@@ -81,7 +83,6 @@ def fetch_all_feeds():
                     save_cve_entry(entry)
                     all_entries.append(entry)
             else:
-                # Parse RSS/Atom feeds
                 import xml.etree.ElementTree as ET
                 xml = ET.fromstring(resp.text)
                 for item in xml.findall(".//item"):
@@ -122,7 +123,7 @@ def fetch_all_feeds():
     conn.close()
     return all_entries
 
-# ------------------ Helper: Save CVE ------------------
+# ------------------ Save CVE ------------------
 def save_cve_entry(entry):
     conn = sqlite3.connect(DB_FILE)
     cur = conn.cursor()
