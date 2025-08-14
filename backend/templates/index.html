@@ -1,19 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OpenThreatIQ Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
 <body>
     <h1>OpenThreatIQ - Threat Intelligence Dashboard</h1>
 
-    <!-- Controls -->
-    <div id="controls">
-        <input type="text" id="search-input" placeholder="Search CVEs...">
-        <select id="sort-select">
-            <option value="newest">Sort by Newest</option>
-            <option value="oldest">Sort by Oldest</option>
+    <!-- Filters -->
+    <div class="filters">
+        <input type="text" id="search-bar" placeholder="Search...">
+        
+        <select id="source-filter">
+            <option value="all">All Sources</option>
         </select>
-        <input type="date" id="start-date">
-        <input type="date" id="end-date">
-        <button id="filter-btn">Filter</button>
-        <button id="reset-btn">Reset</button>
+
+        <select id="type-filter">
+            <option value="all">All Types</option>
+        </select>
     </div>
 
+    <!-- Container for threat entries -->
     <div id="cve-container"></div>
-    <script src="{{ url_for('static', filename='main.js') }}"></script>
+
+    <script src="main.js"></script>
 </body>
+</html>
