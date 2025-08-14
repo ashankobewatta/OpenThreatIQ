@@ -1,3 +1,4 @@
+import os
 import requests
 import sqlite3
 import feedparser
@@ -7,7 +8,12 @@ import io
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 
-DB_FILE = "data/threats.db"
+# Paths relative to this file
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+os.makedirs(DATA_DIR, exist_ok=True)
+DB_FILE = os.path.join(DATA_DIR, "threats.db")
+
 CACHE_EXPIRY_MINUTES = 30  # Default
 
 FEEDS = [
