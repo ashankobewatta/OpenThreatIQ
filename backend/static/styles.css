@@ -1,7 +1,26 @@
-body { background-color: #fdf6f0; color: #222; font-family: Arial, sans-serif; }
-.dark-mode { background-color: #1c1c1c; color: #eee; }
-.card { cursor: pointer; transition: 0.2s; }
-.card:hover { transform: scale(1.02); }
+body {
+    background-color: #fdf6f0;
+    color: #222;
+    font-family: Arial, sans-serif;
+    transition: background-color 0.3s, color 0.3s;
+}
+.dark-mode {
+    background-color: #1c1c1c;
+    color: #eee;
+}
+.card {
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    min-height: 150px;
+}
+.card:hover {
+    transform: scale(1.02);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
 .unread { border-left: 4px solid #ff6b6b; }
 .read { opacity: 0.7; }
 .badge { margin-right: 5px; }
+#threat-container { margin-top: 20px; }
+.row.mb-3 label { font-weight: bold; }
+#searchInput { width: 100%; }
+.modal-body { white-space: pre-wrap; }
