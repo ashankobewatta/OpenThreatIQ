@@ -11,8 +11,6 @@ body {
     cursor: pointer;
     transition: transform 0.2s, background-color 0.2s, color 0.2s;
     border-left: 4px solid transparent;
-    padding: 15px;
-    border-radius: 6px;
 }
 
 .card:hover {
@@ -29,12 +27,9 @@ body {
 
 .badge {
     margin-right: 5px;
-    padding: 0.25em 0.5em;
-    font-size: 0.75rem;
-    border-radius: 0.25rem;
+    font-size: 0.85rem;
 }
 
-/* Form elements and select styling */
 .form-label {
     font-weight: 600;
 }
@@ -43,17 +38,6 @@ input, select {
     background-color: #fff;
     color: #222;
     border: 1px solid #ccc;
-}
-
-/* Buttons */
-.btn-primary {
-    background-color: #a0d8ef;
-    border-color: #a0d8ef;
-}
-
-.btn-primary:hover {
-    background-color: #7fc7e6;
-    border-color: #7fc7e6;
 }
 
 /* ---------- DARK MODE ---------- */
@@ -83,16 +67,6 @@ body.dark-mode select {
     border-color: #555;
 }
 
-body.dark-mode .btn-primary {
-    background-color: #4c8da7;
-    border-color: #4c8da7;
-}
-
-body.dark-mode .btn-primary:hover {
-    background-color: #36758a;
-    border-color: #36758a;
-}
-
 body.dark-mode .modal-content {
     background-color: #2a2a2a;
     color: #eee;
@@ -117,4 +91,17 @@ body.dark-mode a {
     .card {
         margin-bottom: 15px;
     }
+}
+
+/* ---------- UTILITY ---------- */
+#dark-mode-toggle {
+    min-width: 150px;
+}
+
+#search-input {
+    border-radius: 6px;
+}
+
+.form-select {
+    border-radius: 6px;
 }
