@@ -1,25 +1,24 @@
 from flask import Flask, jsonify, render_template, request
-from utils import fetch_all_feeds, mark_read, add_user_feed, set_cache_interval, get_cache_interval
+from utils import fetch_all_feeds, mark_read, get_cache_interval, set_cache_interval, add_user_feed, init_db, get_all_threats
 
 app = Flask(__name__)
+init_db()
+
+# Update feeds on startup
+fetch_all_feeds()
 
 @app.route("/")
 def index():
-    threats = fetch_all_feeds()
-    return render_template("index.html", threats=threats, cache_interval=get_cache_interval())
+    return render_template("index.html")
 
 @app.route("/api/threats")
 def api_threats():
-    threats = fetch_all_feeds()
-    return jsonify(threats)
+    return jsonify(get_all_threats())
 
-@app.route("/api/mark_read", methods=["POST"])
-def api_mark_read():
-    tid = request.json.get("id")
-    if tid:
-        mark_read(tid)
-        return jsonify({"status": "success"})
-    return jsonify({"status": "error"}), 400
+@app.route("/api/mark_read/<threat_id>", methods=["GET"])
+def api_mark_read(threat_id):
+    mark_read(threat_id)
+    return jsonify({"status": "ok"})
 
 @app.route("/api/add_feed", methods=["POST"])
 def api_add_feed():
@@ -29,16 +28,18 @@ def api_add_feed():
     ttype = data.get("type")
     if url and source and ttype:
         add_user_feed(url, source, ttype)
-        return jsonify({"status": "success"})
-    return jsonify({"status": "error"}), 400
+        fetch_all_feeds()
+        return jsonify({"status": "added"})
+    return jsonify({"status": "error", "message": "Missing parameters"}), 400
 
-@app.route("/api/cache_interval", methods=["POST"])
+@app.route("/api/cache_interval", methods=["GET", "POST"])
 def api_cache_interval():
-    minutes = request.json.get("minutes")
-    if minutes:
-        set_cache_interval(int(minutes))
-        return jsonify({"status": "success"})
-    return jsonify({"status": "error"}), 400
+    if request.method == "POST":
+        minutes = int(request.json.get("minutes", 30))
+        set_cache_interval(minutes)
+        return jsonify({"status": "ok", "minutes": minutes})
+    else:
+        return jsonify({"minutes": get_cache_interval()})
 
 if __name__ == "__main__":
     app.run(debug=True)
