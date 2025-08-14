@@ -3,62 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <title>OpenThreatIQ Dashboard</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
-    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
-<div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>OpenThreatIQ</h2>
-        <div>
-            <button id="darkToggle" class="btn btn-outline-secondary btn-sm">Dark Mode</button>
+    <div class="container py-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1>OpenThreatIQ - Threat Intelligence Dashboard</h1>
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="dark-toggle">
+                <label class="form-check-label" for="dark-toggle">Dark Mode</label>
+            </div>
+        </div>
+
+        <!-- Filters & Search -->
+        <div class="row g-3 mb-3">
+            <div class="col-md-3">
+                <label class="form-label">Source</label>
+                <select id="source-filter" class="form-select"></select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Type</label>
+                <select id="type-filter" class="form-select"></select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Read Status</label>
+                <select id="read-filter" class="form-select">
+                    <option value="All">All</option>
+                    <option value="Read">Read</option>
+                    <option value="Unread">Unread</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <label class="form-label">Search</label>
+                <input type="text" id="search-bar" class="form-control" placeholder="Search threats...">
+            </div>
+        </div>
+
+        <!-- Cache interval -->
+        <div class="row mb-3">
+            <div class="col-md-3">
+                <label class="form-label">Cache Refresh Interval (mins)</label>
+                <select id="cache-interval" class="form-select">
+                    <option value="10">10</option>
+                    <option value="30" selected>30</option>
+                    <option value="60">60</option>
+                    <option value="120">120</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Add custom feed -->
+        <div class="row mb-4">
+            <div class="col-md-12">
+                <form id="add-feed-form" class="row g-2 align-items-end">
+                    <div class="col-md-5">
+                        <label class="form-label">Feed URL</label>
+                        <input type="url" id="feed-url" class="form-control" placeholder="https://example.com/feed">
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Source</label>
+                        <input type="text" id="feed-source" class="form-control" placeholder="Custom Source">
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label">Type</label>
+                        <input type="text" id="feed-type" class="form-control" placeholder="Malware, CVE, etc.">
+                    </div>
+                    <div class="col-md-2">
+                        <button type="submit" class="btn btn-primary w-100">Add Feed</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Threat Cards -->
+        <div id="cve-container" class="row g-3"></div>
+    </div>
+
+    <!-- Modal for full description -->
+    <div id="threatModal" class="modal" tabindex="-1" style="display:none;">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="modalTitle"></h5>
+                    <button type="button" class="btn-close" id="closeModal"></button>
+                </div>
+                <div class="modal-body" id="modalBody"></div>
+                <div class="modal-footer">
+                    <a href="#" id="modalLink" class="btn btn-secondary" target="_blank">Go to Source</a>
+                    <button type="button" class="btn btn-primary" id="closeModalBtn">Close</button>
+                </div>
+            </div>
         </div>
     </div>
 
-    <div class="row mb-3">
-        <div class="col-md-4">
-            <input type="text" id="searchInput" class="form-control" placeholder="Search...">
-        </div>
-        <div class="col-md-2">
-            <select id="sourceFilter" class="form-select">
-                <option value="">All Sources</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <select id="typeFilter" class="form-select">
-                <option value="">All Types</option>
-            </select>
-        </div>
-        <div class="col-md-2">
-            <select id="readFilter" class="form-select">
-                <option value="">All</option>
-                <option value="0">Unread</option>
-                <option value="1">Read</option>
-            </select>
-        </div>
-    </div>
-
-    <div id="threatContainer" class="row g-3"></div>
-</div>
-
-<!-- Modal -->
-<div class="modal fade" id="detailModal" tabindex="-1">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title" id="modalTitle"></h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body" id="modalDesc"></div>
-      <div class="modal-footer">
-        <a href="#" target="_blank" id="modalLink" class="btn btn-primary">Go to Source</a>
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-<script src="main.js"></script>
+    <!-- Scripts -->
+    <script src="main.js"></script>
 </body>
 </html>
