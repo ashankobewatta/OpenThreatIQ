@@ -1,3 +1,4 @@
+# backend/utils.py
 import requests
 import json
 import os
@@ -20,7 +21,8 @@ def fetch_cves():
             with open(CACHE_FILE, "r") as f:
                 return json.load(f)
 
-    # Download compressed JSON feed from NVD
+    # If cache is missing or old, download fresh feed
+    print("Fetching latest CVE feed from NVD...")
     resp = requests.get(FEED_URL, headers={"User-Agent": "OpenThreatIQ/1.0"})
     resp.raise_for_status()
 
@@ -41,4 +43,5 @@ def fetch_cves():
     with open(CACHE_FILE, "w") as f:
         json.dump(cves, f, indent=2)
 
+    print(f"Fetched and cached {len(cves)} CVEs.")
     return cves
