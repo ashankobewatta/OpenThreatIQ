@@ -3,7 +3,6 @@ body {
     background-color: #fdf6f0;
     color: #222;
     font-family: Arial, sans-serif;
-    transition: background-color 0.3s, color 0.3s;
 }
 
 .card {
@@ -12,14 +11,8 @@ body {
     cursor: pointer;
     transition: transform 0.2s, background-color 0.2s, color 0.2s;
     border-left: 4px solid transparent;
-    border-radius: 6px;
     padding: 15px;
-    margin-bottom: 15px;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.1);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: flex;
-    flex-direction: column;
+    border-radius: 6px;
 }
 
 .card:hover {
@@ -36,49 +29,31 @@ body {
 
 .badge {
     margin-right: 5px;
-    margin-bottom: 5px;
-    display: inline-block;
-    padding: 2px 8px;
-    border-radius: 5px;
-    font-size: 12px;
-    background-color: #a0d8f1;
-    color: #000;
+    padding: 0.25em 0.5em;
+    font-size: 0.75rem;
+    border-radius: 0.25rem;
 }
-
-/* Type-specific badges */
-.badge.type-CVE { background-color: #f7b7a3; }
-.badge.type-Malware { background-color: #f2d388; }
-.badge.type-Phishing { background-color: #a8dadc; }
-.badge.type-Patch { background-color: #b5ead7; }
 
 /* Form elements and select styling */
 .form-label {
     font-weight: 600;
 }
 
-input, select, button {
-    padding: 6px 10px;
-    margin-right: 10px;
-    margin-bottom: 10px;
-    border-radius: 4px;
-    border: 1px solid #ccc;
-    transition: all 0.2s;
-}
-
 input, select {
     background-color: #fff;
     color: #222;
+    border: 1px solid #ccc;
 }
 
-button {
-    background-color: #a0d8f1;
-    border: none;
-    cursor: pointer;
-    color: #000;
+/* Buttons */
+.btn-primary {
+    background-color: #a0d8ef;
+    border-color: #a0d8ef;
 }
 
-button:hover {
-    background-color: #89c2d9;
+.btn-primary:hover {
+    background-color: #7fc7e6;
+    border-color: #7fc7e6;
 }
 
 /* ---------- DARK MODE ---------- */
@@ -108,6 +83,16 @@ body.dark-mode select {
     border-color: #555;
 }
 
+body.dark-mode .btn-primary {
+    background-color: #4c8da7;
+    border-color: #4c8da7;
+}
+
+body.dark-mode .btn-primary:hover {
+    background-color: #36758a;
+    border-color: #36758a;
+}
+
 body.dark-mode .modal-content {
     background-color: #2a2a2a;
     color: #eee;
@@ -125,30 +110,11 @@ body.dark-mode a {
 /* ---------- MODAL ---------- */
 .modal-body {
     white-space: pre-wrap; /* preserve line breaks in descriptions */
-    max-height: 60vh;
-    overflow-y: auto;
-}
-
-/* ---------- FILTERS AND SEARCH ---------- */
-.filters {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    margin-bottom: 15px;
-}
-
-#search-bar {
-    flex: 1;
-    min-width: 150px;
 }
 
 /* ---------- RESPONSIVE OPTIMIZATION ---------- */
 @media (max-width: 992px) {
     .card {
         margin-bottom: 15px;
-    }
-    .filters {
-        flex-direction: column;
-        align-items: flex-start;
     }
 }
