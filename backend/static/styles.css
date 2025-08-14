@@ -1,89 +1,14 @@
-body {
-    background-color: #fdf6f0;
-    color: #222;
-    font-family: Arial, sans-serif;
-}
-
-.card {
-    background-color: #fff5f3;
-    color: #222;
-    cursor: pointer;
-    transition: transform 0.2s, background-color 0.2s, color 0.2s;
-    border-left: 4px solid transparent;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.card:hover {
-    transform: scale(1.02);
-}
-
-.unread {
-    border-left: 4px solid #ff6b6b;
-}
-
-.read {
-    opacity: 0.8;
-}
-
-.badge {
-    margin-right: 5px;
-}
-
-/* DARK MODE */
-body.dark-mode {
-    background-color: #1c1c1c;
-    color: #eee;
-}
-
-body.dark-mode .card {
-    background-color: #2a2a2a;
-    color: #eee;
-}
-
-body.dark-mode .card.unread {
-    border-left: 4px solid #ff6b6b;
-}
-
-body.dark-mode .badge {
-    color: #fff;
-}
-
-body.dark-mode input,
-body.dark-mode select {
-    background-color: #333;
-    color: #eee;
-    border-color: #555;
-}
-
-body.dark-mode .modal-content {
-    background-color: #2a2a2a;
-    color: #eee;
-}
-
-body.dark-mode .modal-header,
-body.dark-mode .modal-footer {
-    border-color: #444;
-}
-
-body.dark-mode a {
-    color: #6ab0f3;
-}
-
+/* ---------- MODAL OPTIMIZATION ---------- */
 .modal-body {
-    white-space: pre-wrap;
-}
-
-@media (max-width: 992px) {
-    .card {
-        margin-bottom: 15px;
-    }
+    max-height: 60vh;        /* Limit height to 60% of viewport */
+    overflow-y: auto;        /* Scroll if content is long */
+    padding: 1rem;           /* Add some padding */
+    line-height: 1.6;        /* Improve readability */
 }
 
 .modal-body p {
-    margin-bottom: 1rem;
-    line-height: 1.5;
-    color: inherit; /* respects light/dark mode */
+    margin-bottom: 1rem;     /* Space between paragraphs */
+    color: inherit;          /* Respect light/dark mode */
 }
 
 .modal-body a {
@@ -91,7 +16,34 @@ body.dark-mode a {
     text-decoration: underline;
 }
 
-.modal-body {
-    max-height: 60vh;
-    overflow-y: auto;
+.modal-content {
+    border-radius: 0.75rem;  /* Slightly rounded corners */
+}
+
+.modal-header,
+.modal-footer {
+    border-color: #ddd;      /* Light border in light mode */
+}
+
+body.dark-mode .modal-header,
+body.dark-mode .modal-footer {
+    border-color: #444;      /* Dark border in dark mode */
+}
+
+/* Optional: custom scrollbar for modal */
+.modal-body::-webkit-scrollbar {
+    width: 8px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background-color: #888;
+    border-radius: 4px;
+}
+
+body.dark-mode .modal-body::-webkit-scrollbar-thumb {
+    background-color: #555;
 }
