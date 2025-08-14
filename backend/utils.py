@@ -10,36 +10,35 @@ from bs4 import BeautifulSoup
 DB_FILE = "data/threats.db"
 DEFAULT_CACHE_MINUTES = 30
 
+# Verified public feeds
 FEEDS = [
     {"url": "https://www.bleepingcomputer.com/feed/", "source": "BleepingComputer", "type": "Malware", "format": "rss"},
     {"url": "https://feeds.feedburner.com/GoogleChromeReleases", "source": "Google Chrome", "type": "Patch", "format": "rss"},
     {"url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "source": "NVD", "type": "CVE", "format": "json"}
 ]
 
+# Initialize DB
 def init_db():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS threats (
-            id TEXT PRIMARY KEY,
-            title TEXT,
-            description TEXT,
-            link TEXT,
-            source TEXT,
-            type TEXT,
-            published_date TEXT,
-            read_flag INTEGER DEFAULT 0
-        )
-    ''')
-    c.execute('''
-        CREATE TABLE IF NOT EXISTS config (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-    ''')
+    c.execute('''CREATE TABLE IF NOT EXISTS threats (
+                    id TEXT PRIMARY KEY,
+                    title TEXT,
+                    description TEXT,
+                    link TEXT,
+                    source TEXT,
+                    type TEXT,
+                    published_date TEXT,
+                    read_flag INTEGER DEFAULT 0
+                )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS config (
+                    key TEXT PRIMARY KEY,
+                    value TEXT
+                )''')
     conn.commit()
     conn.close()
 
+# Get cache interval
 def get_cache_interval():
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
@@ -51,16 +50,17 @@ def get_cache_interval():
 def set_cache_interval(minutes):
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
-    c.execute("REPLACE INTO config(key,value) VALUES (?,?)", ("cache_interval", str(minutes)))
+    c.execute("REPLACE INTO config(key, value) VALUES (?, ?)", ("cache_interval", str(minutes)))
     conn.commit()
     conn.close()
 
+# Fetch all feeds
 def fetch_all_feeds():
     init_db()
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
 
-    # Cache check
+    # Check last update
     c.execute("SELECT value FROM config WHERE key='last_update'")
     row = c.fetchone()
     now = datetime.utcnow()
@@ -72,29 +72,40 @@ def fetch_all_feeds():
             return get_all_threats()
 
     print(f"[{datetime.now().isoformat()}] Updating feeds...")
-    for feed in FEEDS:
+
+    # Include user-added feeds
+    conn_user = sqlite3.connect(DB_FILE)
+    c_user = conn_user.cursor()
+    c_user.execute("SELECT key, value FROM config WHERE key LIKE 'user_feed_%'")
+    user_feeds = [{"url": v, "source": k.split("user_feed_")[1], "type": "Custom", "format": "rss"} for k, v in c_user.fetchall()]
+    conn_user.close()
+
+    feeds_to_fetch = FEEDS + user_feeds
+
+    for feed in feeds_to_fetch:
         try:
             if feed["format"] == "rss":
                 items = fetch_rss_feed(feed["url"])
                 for item in items:
-                    upsert_threat(c, item["id"], item["title"], item["description"], item["link"], feed["source"], feed["type"], item["published_date"])
+                    upsert_threat(c, item["id"], item["title"], item["description"], item["link"], feed.get("source", "Unknown"), feed.get("type", "Unknown"), item["published_date"])
             elif feed["format"] == "json":
                 items = fetch_nvd_json(feed["url"])
                 for item in items:
-                    upsert_threat(c, item["id"], item["id"], item["description"], "", feed["source"], feed["type"], item["publishedDate"])
+                    upsert_threat(c, item["id"], item["id"], item["description"], "", feed.get("source", "Unknown"), feed.get("type", "Unknown"), item.get("publishedDate", ""))
         except Exception as e:
-            print(f"Error fetching {feed['source']}: {e}")
+            print(f"Error fetching {feed.get('source', 'Unknown')}: {e}")
 
-    c.execute("REPLACE INTO config(key,value) VALUES (?,?)", ("last_update", now.isoformat()))
+    c.execute("REPLACE INTO config(key, value) VALUES (?, ?)", ("last_update", now.isoformat()))
     conn.commit()
     conn.close()
     return get_all_threats()
 
-def upsert_threat(c, tid, title, desc, link, source, ttype, pubdate):
-    c.execute('''
-        INSERT OR REPLACE INTO threats(id,title,description,link,source,type,published_date)
-        VALUES (?,?,?,?,?,?,?)
-    ''', (tid, title, desc, link, source, ttype, pubdate))
+# Insert or update threats
+def upsert_threat(cursor, tid, title, description, link, source, ttype, pubdate):
+    cursor.execute('''
+        INSERT OR REPLACE INTO threats(id, title, description, link, source, type, published_date)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (tid, title, description, link, source, ttype, pubdate))
 
 def fetch_rss_feed(url):
     headers = {"User-Agent": "OpenThreatIQ/1.0"}
@@ -144,6 +155,10 @@ def mark_read(threat_id):
     conn.commit()
     conn.close()
 
-def add_user_feed(url, source, ttype):
-    FEEDS.append({"url": url, "source": source, "type": ttype, "format": "rss"})
-    fetch_all_feeds()
+def add_user_feed(url, name):
+    conn = sqlite3.connect(DB_FILE)
+    c = conn.cursor()
+    key = f"user_feed_{name}"
+    c.execute("REPLACE INTO config(key, value) VALUES (?, ?)", (key, url))
+    conn.commit()
+    conn.close()
