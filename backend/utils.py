@@ -1,124 +1,156 @@
-import os
-import json
 import requests
-import feedparser
+import json
+import os
+import gzip
+import io
+import sqlite3
 from datetime import datetime, timedelta
 
-CACHE_FILE = "data/cve_cache.json"
+DB_FILE = "data/threatiq.db"
+FEED_URLS = [
+    {"name": "NVD", "url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz", "type": "CVE"},
+    {"name": "Beeping Computer", "url": "https://www.beepingcomputer.com/feed/", "type": "Update"},
+    {"name": "Google Security Blog", "url": "https://security.googleblog.com/feeds/posts/default", "type": "Update"},
+    {"name": "Microsoft Security", "url": "https://msrc.microsoft.com/update-guide/rss", "type": "Update"}
+]
 CACHE_EXPIRY_HOURS = 24
 
-# ------------------- Verified free public feeds -------------------
-FEEDS = [
-    {"name": "NVD", "type": "CVE", "url": "https://nvd.nist.gov/feeds/json/cve/1.1/nvdcve-1.1-recent.json.gz"},
-    {"name": "MSRC", "type": "Update", "url": "https://api.msrc.microsoft.com/sug/v2.0/en-US/vuln"},
-    {"name": "MalwareBazaar", "type": "Malware", "url": "https://bazaar.abuse.ch/export/csv/"},
-    {"name": "PhishTank", "type": "Phishing", "url": "https://data.phishtank.com/data/online-valid.csv"},
-    {"name": "OpenPhish", "type": "Phishing", "url": "https://openphish.com/feed.txt"},
-    {"name": "ExploitDB", "type": "Exploit", "url": "https://www.exploit-db.com/rss.xml"},
-    {"name": "BleepingComputer", "type": "Update", "url": "https://www.bleepingcomputer.com/feed/"},
-    {"name": "GoogleChrome", "type": "Update", "url": "https://chromereleases.googleblog.com/feeds/posts/default?alt=rss"},
-    {"name": "Mozilla", "type": "Update", "url": "https://www.mozilla.org/en-US/security/advisories/feed/"}
-]
-
-# ------------------- Helper: read cache -------------------
-def read_cache():
-    if os.path.exists(CACHE_FILE):
-        mtime = datetime.fromtimestamp(os.path.getmtime(CACHE_FILE))
-        if datetime.now() - mtime < timedelta(hours=CACHE_EXPIRY_HOURS):
-            print(f"[{datetime.now().isoformat()}] Using cached data from {CACHE_FILE}")
-            with open(CACHE_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-    return []
-
-# ------------------- Helper: fetch JSON feed -------------------
-def fetch_json_feed(feed):
-    try:
-        resp = requests.get(feed["url"], headers={"User-Agent": "OpenThreatIQ/1.0"})
-        resp.raise_for_status()
-        if feed["url"].endswith(".gz"):
-            import gzip, io
-            with gzip.open(io.BytesIO(resp.content), 'rt', encoding='utf-8') as f:
-                data = json.load(f)
-                items = []
-                for entry in data.get("CVE_Items", []):
-                    items.append({
-                        "id": entry["cve"]["CVE_data_meta"]["ID"],
-                        "description": entry["cve"]["description"]["description_data"][0]["value"],
-                        "publishedDate": entry["publishedDate"],
-                        "type": feed["type"],
-                        "source": feed["name"]
-                    })
-                return items
-        else:
-            # Non-gzip JSON (like MSRC)
-            data = resp.json()
-            items = []
-            for entry in data.get("value", []):
-                items.append({
-                    "id": entry.get("VulnID", entry.get("CVEID", "N/A")),
-                    "description": entry.get("Title", ""),
-                    "publishedDate": entry.get("PublishDate", ""),
-                    "type": feed["type"],
-                    "source": feed["name"]
-                })
-            return items
-    except Exception as e:
-        print(f"[{datetime.now().isoformat()}] Error fetching {feed['name']}: {e}")
-        return []
-
-# ------------------- Helper: fetch RSS/CSV feed -------------------
-def fetch_rss_csv_feed(feed):
-    items = []
-    try:
-        if feed["url"].endswith(".csv"):
-            resp = requests.get(feed["url"], headers={"User-Agent": "OpenThreatIQ/1.0"})
-            resp.raise_for_status()
-            lines = resp.text.splitlines()
-            for line in lines[1:]:
-                parts = line.split(",")
-                if len(parts) >= 2:
-                    items.append({
-                        "id": parts[0],
-                        "description": ",".join(parts[1:]),
-                        "publishedDate": "",
-                        "type": feed["type"],
-                        "source": feed["name"]
-                    })
-        else:
-            feed_data = feedparser.parse(feed["url"])
-            for entry in feed_data.entries:
-                items.append({
-                    "id": entry.get("title", "N/A"),
-                    "description": entry.get("summary", ""),
-                    "publishedDate": entry.get("published", ""),
-                    "type": feed["type"],
-                    "source": feed["name"]
-                })
-    except Exception as e:
-        print(f"[{datetime.now().isoformat()}] Error fetching {feed['name']}: {e}")
-    return items
-
-# ------------------- Main fetch all feeds -------------------
-def fetch_all_feeds():
+# ------------------ DB Setup ------------------
+def init_db():
     os.makedirs("data", exist_ok=True)
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    # CVE entries
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS cve_entries (
+            id TEXT PRIMARY KEY,
+            description TEXT,
+            published_date TEXT,
+            type TEXT,
+            source TEXT,
+            read_flag INTEGER DEFAULT 0
+        )
+    """)
+    # Custom feeds
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS custom_feeds (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            url TEXT,
+            type TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+# ------------------ Fetch NVD/GLOBAL feeds ------------------
+def fetch_all_feeds():
+    init_db()
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+
+    # Check if cache is fresh
+    cur.execute("SELECT MAX(published_date) FROM cve_entries")
+    last_date_row = cur.fetchone()
+    if last_date_row and last_date_row[0]:
+        last_date = datetime.fromisoformat(last_date_row[0])
+        if datetime.now() - last_date < timedelta(hours=CACHE_EXPIRY_HOURS):
+            print(f"[{datetime.now().isoformat()}] Using cached CVEs from DB")
+            conn.close()
+            return get_all_cves()
+
     all_entries = []
 
-    # Try to fetch all feeds
-    for feed in FEEDS:
-        if feed["url"].endswith(".json") or feed["url"].endswith(".gz"):
-            entries = fetch_json_feed(feed)
-        else:
-            entries = fetch_rss_csv_feed(feed)
-        all_entries.extend(entries)
+    for feed in FEED_URLS:
+        print(f"Fetching feed: {feed['name']}")
+        try:
+            resp = requests.get(feed["url"], headers={"User-Agent": "OpenThreatIQ/1.0"}, timeout=15)
+            resp.raise_for_status()
+            if feed["url"].endswith(".gz"):
+                with gzip.open(io.BytesIO(resp.content), 'rt', encoding='utf-8') as f:
+                    data = json.load(f)
+                items = data.get("CVE_Items", [])
+                for item in items:
+                    entry = {
+                        "id": item["cve"]["CVE_data_meta"]["ID"],
+                        "description": item["cve"]["description"]["description_data"][0]["value"],
+                        "published_date": item["publishedDate"],
+                        "type": feed["type"],
+                        "source": feed["name"]
+                    }
+                    save_cve_entry(entry)
+                    all_entries.append(entry)
+            else:
+                # Parse RSS/Atom feeds
+                import xml.etree.ElementTree as ET
+                xml = ET.fromstring(resp.text)
+                for item in xml.findall(".//item"):
+                    entry = {
+                        "id": item.find("title").text if item.find("title") is not None else "N/A",
+                        "description": item.find("description").text if item.find("description") is not None else "",
+                        "published_date": item.find("pubDate").text if item.find("pubDate") is not None else "",
+                        "type": feed["type"],
+                        "source": feed["name"]
+                    }
+                    save_cve_entry(entry)
+                    all_entries.append(entry)
+        except Exception as e:
+            print(f"Error fetching {feed['name']}: {e}")
 
-    # Fallback to cache if no entries fetched
-    if not all_entries:
-        print(f"[{datetime.now().isoformat()}] No feeds fetched, using fallback cache.")
-        return read_cache()
+    # Fetch custom feeds
+    cur.execute("SELECT name, url, type FROM custom_feeds")
+    custom_feeds = cur.fetchall()
+    for name, url, ftype in custom_feeds:
+        try:
+            resp = requests.get(url, timeout=15)
+            resp.raise_for_status()
+            import xml.etree.ElementTree as ET
+            xml = ET.fromstring(resp.text)
+            for item in xml.findall(".//item"):
+                entry = {
+                    "id": item.find("title").text if item.find("title") is not None else "N/A",
+                    "description": item.find("description").text if item.find("description") is not None else "",
+                    "published_date": item.find("pubDate").text if item.find("pubDate") is not None else "",
+                    "type": ftype,
+                    "source": name
+                }
+                save_cve_entry(entry)
+                all_entries.append(entry)
+        except Exception as e:
+            print(f"Error fetching custom feed {name}: {e}")
 
-    # Save to cache
-    with open(CACHE_FILE, "w", encoding="utf-8") as f:
-        json.dump(all_entries, f, indent=2)
-        print(f"[{datetime.now().isoformat()}] Cache updated with {len(all_entries)} entries.")
-    
+    conn.close()
     return all_entries
+
+# ------------------ Helper: Save CVE ------------------
+def save_cve_entry(entry):
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            INSERT OR REPLACE INTO cve_entries (id, description, published_date, type, source)
+            VALUES (?,?,?,?,?)
+        """, (entry["id"], entry["description"], entry["published_date"], entry["type"], entry["source"]))
+        conn.commit()
+    except Exception as e:
+        print(f"Error saving entry {entry['id']}: {e}")
+    finally:
+        conn.close()
+
+# ------------------ Get all CVEs from DB ------------------
+def get_all_cves():
+    conn = sqlite3.connect(DB_FILE)
+    conn.row_factory = sqlite3.Row
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM cve_entries ORDER BY published_date DESC")
+    rows = cur.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+# ------------------ Add custom feed ------------------
+def add_custom_feed(name, url, ftype):
+    conn = sqlite3.connect(DB_FILE)
+    cur = conn.cursor()
+    cur.execute("INSERT INTO custom_feeds (name, url, type) VALUES (?,?,?)", (name, url, ftype))
+    conn.commit()
+    conn.close()
