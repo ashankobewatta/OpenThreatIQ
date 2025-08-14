@@ -1,4 +1,4 @@
-/* ---------- LIGHT MODE (default pastel theme) ---------- */
+/* ---------- LIGHT MODE (pastel theme) ---------- */
 body {
     background-color: #fdf6f0;
     color: #222;
@@ -27,17 +27,6 @@ body {
 
 .badge {
     margin-right: 5px;
-    font-size: 0.85rem;
-}
-
-.form-label {
-    font-weight: 600;
-}
-
-input, select {
-    background-color: #fff;
-    color: #222;
-    border: 1px solid #ccc;
 }
 
 /* ---------- DARK MODE ---------- */
@@ -83,25 +72,12 @@ body.dark-mode a {
 
 /* ---------- MODAL ---------- */
 .modal-body {
-    white-space: pre-wrap; /* preserve line breaks in descriptions */
+    white-space: pre-wrap;
 }
 
-/* ---------- RESPONSIVE OPTIMIZATION ---------- */
+/* ---------- RESPONSIVE ---------- */
 @media (max-width: 992px) {
     .card {
         margin-bottom: 15px;
     }
-}
-
-/* ---------- UTILITY ---------- */
-#dark-mode-toggle {
-    min-width: 150px;
-}
-
-#search-input {
-    border-radius: 6px;
-}
-
-.form-select {
-    border-radius: 6px;
 }
