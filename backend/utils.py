@@ -6,9 +6,10 @@ import gzip
 import io
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
+import os
 
-DB_FILE = "data/threats.db"
-CACHE_EXPIRY_MINUTES = 30  # Default
+DB_FILE = os.path.join(os.path.dirname(__file__), "data", "threats.db")
+CACHE_EXPIRY_MINUTES = 30
 
 FEEDS = [
     {"url": "https://www.bleepingcomputer.com/feed/", "source": "BleepingComputer", "type": "Malware", "format": "rss"},
@@ -17,6 +18,7 @@ FEEDS = [
 ]
 
 def init_db():
+    os.makedirs(os.path.dirname(DB_FILE), exist_ok=True)
     conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS threats (
@@ -47,11 +49,9 @@ def fetch_all_feeds():
     if row:
         last_update = datetime.fromisoformat(row[0])
         if now - last_update < timedelta(minutes=get_cache_interval()):
-            print(f"[{datetime.now().isoformat()}] Using cached threats from DB")
             conn.close()
             return get_all_threats()
 
-    print(f"[{datetime.now().isoformat()}] Updating feeds...")
     for feed in FEEDS:
         try:
             if feed["format"] == "rss":
@@ -82,22 +82,20 @@ def fetch_rss_feed(url):
     items = []
 
     for entry in feed.entries:
-        # Base content from RSS
         content = entry.get("content", [{}])[0].get("value") or entry.get("summary", "")
         content = BeautifulSoup(content, "html.parser").get_text()
 
-        # Attempt to fetch full article for known sources
-        try:
-            if "bleepingcomputer.com" in entry.link or "other-news-site.com" in entry.link:
+        # Fetch full article for trusted sources
+        if "bleepingcomputer.com" in entry.link:
+            try:
                 page_resp = requests.get(entry.link, headers=headers, timeout=10)
                 page_resp.raise_for_status()
                 soup = BeautifulSoup(page_resp.text, "html.parser")
-                # Adjust selector per site
-                full_article_div = soup.find("div", class_="article-content") or soup.find("div", class_="post-content")
-                if full_article_div:
-                    content = full_article_div.get_text(separator="\n").strip()
-        except Exception as e:
-            print(f"Failed to fetch full article from {entry.link}: {e}")
+                full_article = soup.find("div", class_="article-content")
+                if full_article:
+                    content = full_article.get_text(separator="\n").strip()
+            except Exception as e:
+                print(f"Failed to fetch full article from {entry.link}: {e}")
 
         items.append({
             "id": entry.get("id") or entry.get("link"),
