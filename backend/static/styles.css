@@ -1,120 +1,137 @@
-body {
-    background-color: #fdf6f0;
-    color: #222;
-    font-family: Arial, sans-serif;
+:root {
+  --bg: #fdf6f0;
+  --text: #222;
+  --card: #fff5f3;
+  --accent: #ff6b6b;
+  --muted: #888;
+  --border: #e5d7d0;
+  --panel: #ffffff;
+  --link: #0d6efd;
 }
 
+body.dark-mode {
+  --bg: #1c1c1c;
+  --text: #eee;
+  --card: #2a2a2a;
+  --accent: #ff6b6b;
+  --muted: #bbb;
+  --border: #3a3a3a;
+  --panel: #2a2a2a;
+  --link: #6ab0f3;
+}
+
+/* Base */
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Toolbar */
+.toolbar .form-control, .toolbar .form-select {
+  min-width: 180px;
+}
+
+/* Grid with sliding panel */
+.content-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 0;
+  gap: 16px;
+  transition: grid-template-columns 0.35s ease;
+  align-items: start;
+}
+
+.content-grid.with-panel {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 42vw);
+}
+
+/* Cards */
 .card {
-    background-color: #fff5f3;
-    color: #222;
-    cursor: pointer;
-    transition: transform 0.2s, background-color 0.2s, color 0.2s;
-    border-left: 4px solid transparent;
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border-left: 4px solid transparent;
 }
 
 .card:hover {
-    transform: scale(1.02);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
 }
 
-.unread {
-    border-left: 4px solid #ff6b6b;
+.unread { border-left: 4px solid var(--accent); }
+.read { opacity: 0.88; }
+
+.badge { margin-right: 6px; }
+
+/* Detail panel */
+.detail-panel {
+  background: var(--panel);
+  color: var(--text);
+  border-left: 1px solid var(--border);
+  height: calc(100vh - 120px);
+  padding: 16px;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(16px);
+  transition: opacity 0.25s ease, transform 0.35s ease;
 }
 
-.read {
-    opacity: 0.8;
+.content-grid.with-panel .detail-panel {
+  opacity: 1;
+  transform: translateX(0);
 }
 
-.badge {
-    margin-right: 5px;
+.detail-body {
+  margin-top: 8px;
+  height: 100%;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  line-height: 1.45;
 }
 
-/* Dark Mode */
-body.dark-mode {
-    background-color: #1c1c1c;
-    color: #eee;
-}
-
-body.dark-mode .card {
-    background-color: #2a2a2a;
-    color: #eee;
-}
-
-body.dark-mode .badge {
-    color: #fff;
-}
-
+/* Inputs in dark mode */
 body.dark-mode input,
 body.dark-mode select {
-    background-color: #333;
-    color: #eee;
-    border-color: #555;
+  background-color: #333;
+  color: var(--text);
+  border-color: var(--border);
 }
 
-/* Popup panel */
-.main-content {
-    display: flex;
-    position: relative;
-}
+/* Links */
+a { color: var(--link); }
 
-.popup-panel {
-    width: 40%;
-    max-width: 600px;
-    min-width: 300px;
-    background-color: #fff5f3;
-    color: #222;
-    position: fixed;
-    top: 70px;
-    right: -100%;
-    height: calc(100% - 100px);
-    box-shadow: -2px 0 10px rgba(0,0,0,0.3);
-    transition: right 0.4s ease;
-    display: flex;
-    flex-direction: column;
-    z-index: 1000;
-    overflow-y: auto;
-    padding: 15px;
+/* Toast */
+.toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  border-radius: 8px;
+  box-shadow: 0 10px 24px rgba(0,0,0,0.15);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px);
+  transition: opacity .2s ease, transform .2s ease;
+  z-index: 2000;
 }
-
-body.dark-mode .popup-panel {
-    background-color: #2a2a2a;
-    color: #eee;
-}
-
-.popup-panel.open {
-    right: 0;
-}
-
-#popup-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 10px;
-}
-
-.popup-body {
-    flex-grow: 1;
-    white-space: pre-wrap;
-    overflow-y: auto;
-}
-
-.popup-footer {
-    text-align: right;
-    margin-top: 10px;
-}
-
-/* Adjust threat container when popup opens */
-.main-content.popup-open #threat-container {
-    flex-basis: 60%;
-    transition: flex-basis 0.4s ease;
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
 }
 
 /* Responsive */
 @media (max-width: 992px) {
-    .card {
-        margin-bottom: 15px;
-    }
-    .popup-panel {
-        width: 80%;
-        min-width: auto;
-    }
+  .content-grid.with-panel {
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 80vw);
+  }
+  .toolbar .form-control, .toolbar .form-select {
+    min-width: 140px;
+  }
 }
