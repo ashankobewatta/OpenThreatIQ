@@ -3,15 +3,12 @@ from utils import fetch_all_feeds, mark_read, get_all_threats, set_cache_interva
 import os
 import logging
 
-# Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# Ensure data folder exists
 os.makedirs("data", exist_ok=True)
 
-# Fetch feeds on startup
 try:
     fetch_all_feeds()
 except Exception as e:
@@ -45,8 +42,6 @@ def api_set_cache():
         data = request.get_json()
         minutes = int(data.get("minutes", 30))
         set_cache_interval(minutes)
-        # Refresh feeds immediately after interval change
-        fetch_all_feeds()
         return jsonify({"status": "ok", "minutes": minutes})
     except Exception as e:
         logging.error(f"Error setting cache interval: {e}")
