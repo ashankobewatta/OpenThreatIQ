@@ -8,8 +8,8 @@
     <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
-<div class="container-fluid p-3">
-    <div class="d-flex flex-wrap align-items-center mb-3 gap-2">
+<div class="container-fluid p-3 dashboard-container">
+    <div class="d-flex flex-wrap align-items-center mb-3 gap-2 controls">
         <input type="text" id="search-input" class="form-control" placeholder="Search threats...">
         <select id="source-filter" class="form-select"></select>
         <select id="type-filter" class="form-select"></select>
@@ -22,24 +22,15 @@
         </select>
         <button id="dark-mode-toggle" class="btn btn-outline-secondary">🌙</button>
     </div>
-    <div id="threat-container" class="row g-2"></div>
+    <div id="threat-container" class="threat-list row g-2"></div>
 </div>
 
-<!-- Modal -->
-<div class="modal fade" id="threatModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 id="modal-title" class="modal-title"></h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body" id="modal-body"></div>
-            <div class="modal-footer">
-                <a id="modal-link" href="#" target="_blank" class="btn btn-primary">Go to Source</a>
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-            </div>
-        </div>
-    </div>
+<!-- Side panel for full content -->
+<div id="threat-panel" class="threat-panel">
+    <button id="close-panel">&times;</button>
+    <h4 id="panel-title"></h4>
+    <p id="panel-body"></p>
+    <a id="panel-link" href="#" target="_blank" class="btn btn-primary mt-2">Go to Source</a>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
