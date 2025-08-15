@@ -6,10 +6,10 @@ import logging
 # Logging setup
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-app = Flask(__name__, template_folder="templates", static_folder="static")
+app = Flask(__name__, template_folder="../frontend", static_folder="../frontend")
 
-# Ensure data folder exists inside the app
-os.makedirs(os.path.join(os.path.dirname(__file__), "data"), exist_ok=True)
+# Ensure data folder exists
+os.makedirs("data", exist_ok=True)
 
 # Fetch feeds on startup
 try:
@@ -30,7 +30,7 @@ def api_threats():
         logging.error(f"Error fetching threats: {e}")
         return jsonify({"status": "error", "message": "Could not fetch threats"}), 500
 
-@app.route("/api/mark_read/<threat_id>", methods=["POST"])
+@app.route("/api/mark_read/<path:threat_id>", methods=["POST"])
 def api_mark_read(threat_id):
     try:
         mark_read(threat_id)
@@ -45,6 +45,8 @@ def api_set_cache():
         data = request.get_json()
         minutes = int(data.get("minutes", 30))
         set_cache_interval(minutes)
+        # Refresh feeds immediately after interval change
+        fetch_all_feeds()
         return jsonify({"status": "ok", "minutes": minutes})
     except Exception as e:
         logging.error(f"Error setting cache interval: {e}")
