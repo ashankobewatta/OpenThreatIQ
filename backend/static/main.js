@@ -6,9 +6,14 @@ const readFilter = document.getElementById("read-filter");
 const cacheIntervalSelect = document.getElementById("cache-interval");
 const darkModeToggle = document.getElementById("dark-mode-toggle");
 
+const threatPanel = document.getElementById("threat-panel");
+const panelTitle = document.getElementById("panel-title");
+const panelBody = document.getElementById("panel-body");
+const panelLink = document.getElementById("panel-link");
+const closePanel = document.getElementById("close-panel");
+
 let threats = [];
 
-// Fetch threats from backend
 async function fetchThreats() {
     try {
         const res = await fetch("/api/threats");
@@ -20,7 +25,6 @@ async function fetchThreats() {
     }
 }
 
-// Populate filter dropdowns
 function populateFilters() {
     const sources = new Set(threats.map(t => t.source || "Unknown"));
     const types = new Set(threats.map(t => t.type || "Unknown"));
@@ -31,14 +35,9 @@ function populateFilters() {
     typeFilter.innerHTML = `<option value="">All Types</option>` +
         [...types].map(t => `<option value="${t}">${t}</option>`).join("");
 
-    readFilter.innerHTML = `
-        <option value="">All</option>
-        <option value="read">Read</option>
-        <option value="unread">Unread</option>
-    `;
+    readFilter.innerHTML = `<option value="">All</option><option value="read">Read</option><option value="unread">Unread</option>`;
 }
 
-// Render threat cards
 function renderThreats() {
     const searchText = searchInput.value.toLowerCase();
     const sourceVal = sourceFilter.value;
@@ -65,17 +64,17 @@ function renderThreats() {
                     <span class="badge bg-warning text-dark">${t.type}</span>
                 </div>
             `;
-            card.addEventListener("click", () => showModal(t));
+            card.addEventListener("click", () => showPanel(t));
             threatContainer.appendChild(card);
         });
 }
 
-// Show modal with full threat details
-function showModal(threat) {
-    document.getElementById("modal-title").textContent = threat.title;
-    document.getElementById("modal-body").textContent = threat.description;
-    document.getElementById("modal-link").href = threat.link || "#";
+function showPanel(threat) {
+    panelTitle.textContent = threat.title;
+    panelBody.textContent = threat.description;
+    panelLink.href = threat.link || "#";
 
+    // Mark read
     if (!threat.read_flag) {
         fetch(`/api/mark_read/${encodeURIComponent(threat.id)}`, { method: "POST" })
             .then(() => {
@@ -84,20 +83,24 @@ function showModal(threat) {
             });
     }
 
-    new bootstrap.Modal(document.getElementById("threatModal")).show();
+    // Slide panel in and shift list
+    threatPanel.style.left = "0";
+    document.querySelector(".dashboard-container").style.transform = "translateX(50%)";
 }
 
-// Cache interval change triggers immediate refresh
+closePanel.addEventListener("click", () => {
+    threatPanel.style.left = "-100%";
+    document.querySelector(".dashboard-container").style.transform = "translateX(0)";
+});
+
+// Cache interval change
 cacheIntervalSelect.addEventListener("change", () => {
     const minutes = parseInt(cacheIntervalSelect.value, 10);
     fetch("/api/set_cache_interval", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ minutes })
-    }).then(res => {
-        if (!res.ok) console.error("Failed to set cache interval");
-        fetchThreats();
-    });
+    }).then(() => fetchThreats());
 });
 
 // Event listeners
