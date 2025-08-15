@@ -6,11 +6,11 @@ const readFilter = document.getElementById("read-filter");
 const cacheIntervalSelect = document.getElementById("cache-interval");
 const darkModeToggle = document.getElementById("dark-mode-toggle");
 
-const threatPanel = document.getElementById("threat-panel");
-const panelTitle = document.getElementById("panel-title");
-const panelBody = document.getElementById("panel-body");
-const panelLink = document.getElementById("panel-link");
-const closePanel = document.getElementById("close-panel");
+const popupPanel = document.getElementById("popup-panel");
+const popupTitle = document.getElementById("popup-title");
+const popupBody = document.getElementById("popup-body");
+const popupLink = document.getElementById("popup-link");
+const popupClose = document.getElementById("popup-close");
 
 let threats = [];
 
@@ -35,7 +35,11 @@ function populateFilters() {
     typeFilter.innerHTML = `<option value="">All Types</option>` +
         [...types].map(t => `<option value="${t}">${t}</option>`).join("");
 
-    readFilter.innerHTML = `<option value="">All</option><option value="read">Read</option><option value="unread">Unread</option>`;
+    readFilter.innerHTML = `
+        <option value="">All</option>
+        <option value="read">Read</option>
+        <option value="unread">Unread</option>
+    `;
 }
 
 function renderThreats() {
@@ -58,23 +62,25 @@ function renderThreats() {
             card.className = `card ${t.read_flag ? "read" : "unread"} p-3`;
             card.innerHTML = `
                 <h5>${t.title}</h5>
-                <p>${t.description.length > 200 ? t.description.slice(0, 200) + "..." : t.description}</p>
+                <p>${t.description.slice(0, 200)}...</p>
                 <div>
                     <span class="badge bg-info">${t.source}</span>
                     <span class="badge bg-warning text-dark">${t.type}</span>
                 </div>
             `;
-            card.addEventListener("click", () => showPanel(t));
+            card.addEventListener("click", () => showPopup(t));
             threatContainer.appendChild(card);
         });
 }
 
-function showPanel(threat) {
-    panelTitle.textContent = threat.title;
-    panelBody.textContent = threat.description;
-    panelLink.href = threat.link || "#";
+function showPopup(threat) {
+    popupTitle.textContent = threat.title;
+    popupBody.textContent = threat.description; // full content
+    popupLink.href = threat.link || "#";
 
-    // Mark read
+    document.querySelector(".main-content").classList.add("popup-open");
+    popupPanel.classList.add("open");
+
     if (!threat.read_flag) {
         fetch(`/api/mark_read/${encodeURIComponent(threat.id)}`, { method: "POST" })
             .then(() => {
@@ -82,32 +88,32 @@ function showPanel(threat) {
                 renderThreats();
             });
     }
-
-    // Slide panel in and shift list
-    threatPanel.style.left = "0";
-    document.querySelector(".dashboard-container").style.transform = "translateX(50%)";
 }
 
-closePanel.addEventListener("click", () => {
-    threatPanel.style.left = "-100%";
-    document.querySelector(".dashboard-container").style.transform = "translateX(0)";
-});
+function closePopup() {
+    popupPanel.classList.remove("open");
+    document.querySelector(".main-content").classList.remove("popup-open");
+}
 
-// Cache interval change
+// Event listeners
+popupClose.addEventListener("click", closePopup);
+searchInput.addEventListener("input", renderThreats);
+sourceFilter.addEventListener("change", renderThreats);
+typeFilter.addEventListener("change", renderThreats);
+readFilter.addEventListener("change", renderThreats);
+
 cacheIntervalSelect.addEventListener("change", () => {
     const minutes = parseInt(cacheIntervalSelect.value, 10);
     fetch("/api/set_cache_interval", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ minutes })
-    }).then(() => fetchThreats());
+    }).then(res => {
+        if (!res.ok) console.error("Failed to set cache interval");
+        else fetchThreats(); // immediately refresh threats
+    });
 });
 
-// Event listeners
-searchInput.addEventListener("input", renderThreats);
-sourceFilter.addEventListener("change", renderThreats);
-typeFilter.addEventListener("change", renderThreats);
-readFilter.addEventListener("change", renderThreats);
 darkModeToggle.addEventListener("click", () => document.body.classList.toggle("dark-mode"));
 
 // Initial load
