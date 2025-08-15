@@ -2,7 +2,6 @@ body {
     background-color: #fdf6f0;
     color: #222;
     font-family: Arial, sans-serif;
-    overflow-x: hidden;
 }
 
 .card {
@@ -17,41 +16,19 @@ body {
     transform: scale(1.02);
 }
 
-.unread { border-left: 4px solid #ff6b6b; }
-.read { opacity: 0.8; }
-
-.badge { margin-right: 5px; }
-
-.dashboard-container { transition: transform 0.3s ease; }
-
-/* ---------- Side Panel ---------- */
-.threat-panel {
-    position: fixed;
-    top: 0;
-    left: -100%;
-    width: 50%;
-    max-width: 600px;
-    height: 100%;
-    background-color: #fff;
-    color: #222;
-    overflow-y: auto;
-    padding: 20px;
-    box-shadow: 4px 0 12px rgba(0,0,0,0.3);
-    transition: left 0.3s ease;
-    z-index: 1050;
+.unread {
+    border-left: 4px solid #ff6b6b;
 }
 
-.threat-panel h4 { margin-top: 0; }
-.threat-panel button#close-panel {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    border: none;
-    background: none;
-    font-size: 1.5rem;
-    cursor: pointer;
+.read {
+    opacity: 0.8;
 }
 
+.badge {
+    margin-right: 5px;
+}
+
+/* Dark Mode */
 body.dark-mode {
     background-color: #1c1c1c;
     color: #eee;
@@ -62,17 +39,82 @@ body.dark-mode .card {
     color: #eee;
 }
 
-body.dark-mode .badge { color: #fff; }
+body.dark-mode .badge {
+    color: #fff;
+}
 
-body.dark-mode input, body.dark-mode select {
+body.dark-mode input,
+body.dark-mode select {
     background-color: #333;
     color: #eee;
     border-color: #555;
 }
 
-body.dark-mode .threat-panel { background-color: #2a2a2a; color: #eee; }
+/* Popup panel */
+.main-content {
+    display: flex;
+    position: relative;
+}
 
+.popup-panel {
+    width: 40%;
+    max-width: 600px;
+    min-width: 300px;
+    background-color: #fff5f3;
+    color: #222;
+    position: fixed;
+    top: 70px;
+    right: -100%;
+    height: calc(100% - 100px);
+    box-shadow: -2px 0 10px rgba(0,0,0,0.3);
+    transition: right 0.4s ease;
+    display: flex;
+    flex-direction: column;
+    z-index: 1000;
+    overflow-y: auto;
+    padding: 15px;
+}
+
+body.dark-mode .popup-panel {
+    background-color: #2a2a2a;
+    color: #eee;
+}
+
+.popup-panel.open {
+    right: 0;
+}
+
+#popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.popup-body {
+    flex-grow: 1;
+    white-space: pre-wrap;
+    overflow-y: auto;
+}
+
+.popup-footer {
+    text-align: right;
+    margin-top: 10px;
+}
+
+/* Adjust threat container when popup opens */
+.main-content.popup-open #threat-container {
+    flex-basis: 60%;
+    transition: flex-basis 0.4s ease;
+}
+
+/* Responsive */
 @media (max-width: 992px) {
-    .card { margin-bottom: 15px; }
-    .threat-panel { width: 80%; }
+    .card {
+        margin-bottom: 15px;
+    }
+    .popup-panel {
+        width: 80%;
+        min-width: auto;
+    }
 }
