@@ -77,7 +77,6 @@ function showModal(threat) {
     document.getElementById("modal-link").href = threat.link || "#";
 
     if (!threat.read_flag) {
-        // Encode threat ID to handle slashes and special characters
         fetch(`/api/mark_read/${encodeURIComponent(threat.id)}`, { method: "POST" })
             .then(() => {
                 threat.read_flag = 1;
@@ -88,7 +87,7 @@ function showModal(threat) {
     new bootstrap.Modal(document.getElementById("threatModal")).show();
 }
 
-// Set cache interval
+// Cache interval change triggers immediate refresh
 cacheIntervalSelect.addEventListener("change", () => {
     const minutes = parseInt(cacheIntervalSelect.value, 10);
     fetch("/api/set_cache_interval", {
@@ -97,7 +96,7 @@ cacheIntervalSelect.addEventListener("change", () => {
         body: JSON.stringify({ minutes })
     }).then(res => {
         if (!res.ok) console.error("Failed to set cache interval");
-        else fetchThreats(); // Refresh threats immediately after changing interval
+        fetchThreats();
     });
 });
 
